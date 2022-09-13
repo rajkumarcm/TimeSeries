@@ -25,21 +25,22 @@ def Cal_rolling_mean_var(x):
     rv = rolling_var(x)
     return rm[1], rv[1]
 
-def Plot_Rolling_Mean_Var(x, name):
+def Plot_Rolling_Mean_Var(x, name, axes=None, start_idx=0):
     rm = rolling_mean(x)
     rv = rolling_var(x)
-    fig, axes = plt.subplots(2, 1, figsize=(12, 9))
-    axes[0].plot(rm[:, 0], rm[:, 1], lw=2)
-    axes[0].set_title(f'Rolling Mean -{name}')
-    axes[0].set_xlabel('Number of Samples')
-    axes[0].set_ylabel('Magnitude')
-    axes[0].grid(True)
+    if axes is None:
+        fig, axes = plt.subplots(2, 1, figsize=(12, 9))
+    axes[start_idx].plot(rm[:, 0], rm[:, 1], lw=2)
+    axes[start_idx].set_title(f'Rolling Mean - {name}')
+    axes[start_idx].set_xlabel('Number of Samples')
+    axes[start_idx].set_ylabel('Magnitude')
+    axes[start_idx].grid(True)
 
-    axes[1].plot(rv[:, 0], rv[:, 1], lw=2)
-    axes[1].set_title(f'Rolling Variance -{name}')
-    axes[1].set_xlabel('Number of Samples')
-    axes[1].set_ylabel('Magnitude')
-    axes[1].grid(True)
+    axes[start_idx+1].plot(rv[:, 0], rv[:, 1], lw=2)
+    axes[start_idx+1].set_title(f'Rolling Variance - {name}')
+    axes[start_idx+1].set_xlabel('Number of Samples')
+    axes[start_idx+1].set_ylabel('Magnitude')
+    axes[start_idx+1].grid(True)
     plt.show()
 
 def ADF_Cal(x):
