@@ -28,25 +28,25 @@ df.Date = date_col
 df.set_index('Date', inplace=True)
 
 # 1. Plot
-spacing=22
+spacing=26
+xticks = []
 dates_spaced = []
 for i in range(0, df.shape[0]):
     if i % spacing == 0:
+        xticks.append(i)
         dates_spaced.append(df.index.values[i])
-    else:
-        dates_spaced.append('')
+
+xticks.append(df.shape[0])
+dates_spaced.append(df.index.values[-1])
+
 fig, ax = plt.subplots()
 df.plot(ax=ax)
 ax.legend(loc='upper right')
 ax.set_ylabel('USD($)')
 ax.set_title('Quarterly sales of a small-scale enterprise')
-ax.set_xlabel('Period', labelpad=7)
-ax.set_xticks(np.arange(len(dates_spaced)))
-ax.set_xticklabels(dates_spaced)
-# ax.set_xticks(np.arange(len(df.index.values)))
-# ax.set_xticklabels(df.index.values)
-# for label in ax.xaxis.get_ticklabels()[::spacing]:
-#     label.set_visible(False)
+ax.set_xlabel('Period')
+ax.set_xticks(ticks=xticks, labels=dates_spaced)
+plt.grid(True)
 plt.show()
 
 # 2. Time Series Statistics
@@ -77,8 +77,6 @@ Plot_Rolling_Mean_Var(df.GDP, 'GDP') # Fix the grid problem in the plot---------
    are stationary, given the rolling mean and the variance stabilises as more samples are included.
    
 """
-
-#--------------EXPLAIN-------------------------------------------------------------
 
 #5. Perform an ADF test
 # a. Sales
@@ -116,24 +114,23 @@ print(f'{kpss_test(df.AdBudget)}')
 print('\nKPSS results on GDP:')
 print(f'{kpss_test(df.GDP)}')
 
-#-------------------------DO THE 7TH AND 8TH STEPS-----------------------------
-
 # 7.1 - Plot the data
 pass_df = pd.read_csv('../data/AirPassengers.csv', header=0, sep=',',
                       on_bad_lines='warn', names=['Year_Month', 'N_Passengers'], index_col=0)
 spacing = 12
+xticks = []
 dates_spaced = []
 for i in range(pass_df.shape[0]):
     if i%spacing == 0:
+        xticks.append(i)
         dates_spaced.append(pass_df.index.values[i])
-    else:
-        dates_spaced.append(None)
+
 fig, ax = plt.subplots(figsize=(12, 9))
 pass_df.plot(ax=ax, rot=50)
 ax.set_ylabel('Number of Passengers')
 ax.set_title('Number of Air Passengers flew between 1949 - 1960')
-ax.set_xticks(np.arange(len(dates_spaced)))
-ax.set_xticklabels(dates_spaced)
+ax.set_xticks(ticks=xticks, labels=dates_spaced)
+plt.grid(True)
 plt.show()
 
 # 7.2 - Display average, variance and standard deviation
@@ -176,14 +173,70 @@ hypothesis and the alternate hypothesis are the reverse of ADF. Here the null hy
 where as the alternate hypothesis signifies the time-series is a non-stationary signal.
 """
 
-print('breakpoint...')
-diff1 = difference(pass_df.N_Passengers)
-rm, rv = Cal_rolling_mean_var(diff1)
+# First differencing-------------------------------------------------------------------
+diff1 = difference(pass_df.N_Passengers)[1:]
+fig, axes = plt.subplots(3, 1, figsize=(12, 16))
+axes[0].plot(diff1)
+axes[0].set_ylabel('Number of Passengers')
+axes[0].set_title('Number of Air Passengers First order differencing')
+axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
+Plot_Rolling_Mean_Var(diff1, 'First Differencing', axes, 1)
 
+"""
+The rolling mean appears to fluctuate, which reflects that the time-series still has seasonality.
+"""
 
+# Second differencing------------------------------------------------------------------
+diff2 = difference(diff1)[1:]
+fig, axes = plt.subplots(3, 1, figsize=(12, 16))
+axes[0].plot(diff2)
+axes[0].set_ylabel('Number of Passengers')
+axes[0].set_title('Number of Air Passengers Second order differencing')
+axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
+Plot_Rolling_Mean_Var(diff2, 'Second Ordered Differencing', axes, 1)
 
+"""
+The rolling mean shows signs of beginning to stabilise after the second order differencing.
+"""
 
+# Third differencing-------------------------------------------------------------------
+diff3 = difference(diff2)[1:]
+fig, axes = plt.subplots(3, 1, figsize=(12, 16))
+axes[0].plot(diff3)
+axes[0].set_ylabel('Number of Passengers')
+axes[0].set_title('Number of Air Passengers Third ordered differencing')
+axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
+Plot_Rolling_Mean_Var(diff3, 'Third Ordered Differencing', axes, 1)
 
+"""
+The rolling mean appear to have stabilised after the third order differencing. However, higher order differencing
+has no effect on the rolling variance as it steadily increases.
+"""
+
+# Log transform and difference---------------------------------------------------------------------
+eps = 1e-3 # Jut to ensure we do not ask the computer to compute log(0)
+log_n_pass = np.log(pass_df.N_Passengers + eps)
+log_diff1 = difference(log_n_pass)[1:]
+fig, axes = plt.subplots(3, 1, figsize=(12, 16))
+axes[0].plot(log_diff1)
+axes[0].set_ylabel('Number of Passengers')
+axes[0].set_title('Number of Air Passengers Log transformed and first order differencing')
+axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
+Plot_Rolling_Mean_Var(log_diff1, 'Log First Order Differencing', axes, 1)
+
+print('\nADF results on the log transformed and differenced air passengers time-series:')
+print(f'{ADF_Cal(log_diff1)}\n')
+
+print('\nKPSS results on the number of the log transformed and difference number of air passengers:')
+print(f'{kpss_test(log_diff1)}')
+
+"""
+
+"""
 
 
 
