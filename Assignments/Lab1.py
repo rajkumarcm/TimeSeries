@@ -180,6 +180,7 @@ axes[0].plot(diff1)
 axes[0].set_ylabel('Number of Passengers')
 axes[0].set_title('Number of Air Passengers First order differencing')
 axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
 Plot_Rolling_Mean_Var(diff1, 'First Differencing', axes, 1)
 
 """
@@ -193,6 +194,7 @@ axes[0].plot(diff2)
 axes[0].set_ylabel('Number of Passengers')
 axes[0].set_title('Number of Air Passengers Second order differencing')
 axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
 Plot_Rolling_Mean_Var(diff2, 'Second Ordered Differencing', axes, 1)
 
 """
@@ -206,11 +208,12 @@ axes[0].plot(diff3)
 axes[0].set_ylabel('Number of Passengers')
 axes[0].set_title('Number of Air Passengers Third ordered differencing')
 axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
+axes[0].grid(True)
 Plot_Rolling_Mean_Var(diff3, 'Third Ordered Differencing', axes, 1)
 
 """
 The rolling mean appear to have stabilised after the third order differencing. However, higher order differencing
-hs no effect on the rolling variance as it steadily increases.
+has no effect on the rolling variance as it steadily increases.
 """
 
 # Log transform and difference---------------------------------------------------------------------
@@ -225,7 +228,7 @@ axes[0].set_xticks(ticks=xticks, labels=dates_spaced)
 axes[0].grid(True)
 Plot_Rolling_Mean_Var(log_diff1, 'Log First Order Differencing', axes, 1)
 
-print('\nADF results on the log transformed and differenced number of air passengers:')
+print('\nADF results on the log transformed and differenced air passengers time-series:')
 print(f'{ADF_Cal(log_diff1)}\n')
 
 print('\nKPSS results on the number of the log transformed and difference number of air passengers:')
