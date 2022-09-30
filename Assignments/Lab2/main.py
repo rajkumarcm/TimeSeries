@@ -1,0 +1,128 @@
+import numpy as np
+from matplotlib import pyplot as plt
+import pandas as pd
+import pandas_datareader as web
+
+# Q1. Manually calculate before submitting--\/\/\/\/\/\/\/\/\/\/\\/\/\/\/\/\/\/\/\/\/\\/\/\/\/\/\/\/\/\/\/\
+
+# Q2. Generate white noise and plot it
+wn = np.random.normal(0, 1, size=1000)
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].plot(list(range(1000)), wn)
+axes[0].set_title('White Noise')
+axes[0].set_xlabel('Sample')
+axes[0].set_ylabel('White noise')
+axes[1].hist(wn, rwidth=0.9)
+axes[1].set_title('White Noise Histogram')
+axes[1].set_xlabel('White noise')
+axes[1].set_ylabel('White noise frequency')
+print(f"The sample has a mean of {np.mean(wn)} and a standard deviation of {np.std(wn)}")
+plt.show()
+
+# Q3. ACF
+def acf(x, max_lag, ax=None):
+    def __acf(x, lag):
+        acf_val = 0
+        mu = np.mean(x)
+        for t in range(lag, len(x)):
+            acf_val += (x[t] - mu) * (x[t-lag] - mu)
+        return acf_val
+
+    acf_lags = np.zeros([max_lag+1])
+    for k in range(max_lag+1):
+        x_var = __acf(x, 0)
+        acf_lags[k] = __acf(x, k)/x_var
+
+    neg_acf = list(acf_lags[::-1])
+    pos_acf = list(acf_lags[1:])
+    neg_acf.extend(pos_acf)
+    entire_acf = neg_acf
+    m = 1.96/np.sqrt(len(x))
+    if ax is None:
+        plt.figure()
+        plt.stem(np.arange(-max_lag, max_lag+1, 1), entire_acf, markerfmt='ro')
+        plt.axhspan(-m, m, alpha=0.2, color='blue')
+        plt.xlabel('Lag')
+        plt.ylabel(r'$\rho(x)$')
+        plt.title('Auto Correlation')
+        plt.show()
+    else:
+        ax.stem(np.arange(-max_lag, max_lag+1, 1), entire_acf, markerfmt='ro')
+        ax.axhspan(-m, m, alpha=0.2, color='blue')
+
+# Q3. a
+x = [3, 9, 27, 81, 243]
+acf(x, max_lag=4)
+
+# Q3. b
+acf(wn, max_lag=20)
+
+# Q3. c
+# Write down your observations about the ACF plot of stationary dataset.
+
+# Q4.
+from datetime import date
+stocks = ['AAPL','ORCL', 'TSLA', 'IBM','YELP', 'MSFT']
+stocks_name = ['APPLE', 'ORACLE', 'TESLA', 'IBM', 'YELP', 'MICROSOFT']
+close_df = {}
+for stock_symb in stocks:
+    tmp_df = web.DataReader(stock_symb, data_source='yahoo', start='2000-01-01', end=date.today().strftime("%m-%d-%Y"))
+    close_df[stock_symb] = tmp_df.Close
+close_df = pd.DataFrame(close_df)
+
+# Q4.a Plot close value vs time
+spacing = 365 * 5
+fig, axes = plt.subplots(3, 2, sharey=True, figsize=(20, 25))
+plt.title('Closing price of several firm\'s stock')
+nrow = 3
+ncol = 2
+r_idx = 0
+c_idx = 0
+for stock_name, stock_sym in zip(stocks_name, stocks):
+    close_val = close_df.loc[:, stock_sym]
+    close_val.dropna(inplace=True)
+    close_val.plot(ax=axes[r_idx, c_idx])
+    axes[r_idx, c_idx].set_xlabel('Date')
+    axes[r_idx, c_idx].set_ylabel('Closing Price')
+    axes[r_idx, c_idx].set_title(stock_name)
+    axes[r_idx, c_idx].grid(True)
+    if c_idx == 1: # index of 2nd column
+        c_idx = 0
+        r_idx += 1
+    else:
+        c_idx += 1
+plt.show()
+
+# Q4.b ACF of the closing stock price
+fig, axes = plt.subplots(3, 2, figsize=(25, 20))
+nrow = 3
+ncol = 2
+r_idx = 0
+c_idx = 0
+for stock_name, stock in zip(stocks_name, stocks):
+    close_val = close_df.loc[:, stock_sym]
+    close_val.dropna(inplace=True)
+    acf(close_val.to_numpy(), max_lag=50, ax=axes[r_idx, c_idx])
+    if c_idx == 1: # index of 2nd column
+        c_idx = 0
+        r_idx += 1
+    else:
+        c_idx += 1
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
