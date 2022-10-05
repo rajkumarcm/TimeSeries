@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import pandas_datareader as web
 
-# Q1. Manually calculate before submitting--\/\/\/\/\/\/\/\/\/\/\\/\/\/\/\/\/\/\/\/\/\\/\/\/\/\/\/\/\/\/\/\
+# Q1 is answered and will be attached the final report.
 
 # Q2. Generate white noise and plot it
 wn = np.random.normal(0, 1, size=1000)
@@ -66,13 +66,13 @@ stocks = ['AAPL','ORCL', 'TSLA', 'IBM','YELP', 'MSFT']
 stocks_name = ['APPLE', 'ORACLE', 'TESLA', 'IBM', 'YELP', 'MICROSOFT']
 close_df = {}
 for stock_symb in stocks:
-    tmp_df = web.DataReader(stock_symb, data_source='yahoo', start='2000-01-01', end=date.today().strftime("%m-%d-%Y"))
+    tmp_df = web.DataReader(stock_symb, data_source='yahoo', start='2000-01-01', end=date.today().strftime("%Y-%m-%d"))
     close_df[stock_symb] = tmp_df.Close
 close_df = pd.DataFrame(close_df)
 
 # Q4.a Plot close value vs time
 spacing = 365 * 5
-fig, axes = plt.subplots(3, 2, sharey=True, figsize=(20, 25))
+fig, axes = plt.subplots(3, 2, sharey=True, figsize=(16, 8))
 plt.title('Closing price of several firm\'s stock')
 nrow = 3
 ncol = 2
@@ -84,17 +84,23 @@ for stock_name, stock_sym in zip(stocks_name, stocks):
     close_val.plot(ax=axes[r_idx, c_idx])
     axes[r_idx, c_idx].set_xlabel('Date')
     axes[r_idx, c_idx].set_ylabel('Closing Price')
-    axes[r_idx, c_idx].set_title(stock_name)
+    axes[r_idx, c_idx].set_title('Closing Price of ' + stock_name)
     axes[r_idx, c_idx].grid(True)
     if c_idx == 1: # index of 2nd column
         c_idx = 0
         r_idx += 1
     else:
         c_idx += 1
+plt.subplots_adjust(left=0.1,
+                    bottom=0.1,
+                    right=0.9,
+                    top=0.9,
+                    wspace=0.1,
+                    hspace=0.7)
 plt.show()
 
 # Q4.b ACF of the closing stock price
-fig, axes = plt.subplots(3, 2, figsize=(25, 20))
+fig, axes = plt.subplots(3, 2, figsize=(16, 8), sharey=True)
 nrow = 3
 ncol = 2
 r_idx = 0
@@ -103,11 +109,20 @@ for stock_name, stock in zip(stocks_name, stocks):
     close_val = close_df.loc[:, stock_sym]
     close_val.dropna(inplace=True)
     acf(close_val.to_numpy(), max_lag=50, ax=axes[r_idx, c_idx])
+    axes[r_idx, c_idx].set_xlabel('Lag')
+    axes[r_idx, c_idx].set_title(f'Autocorrelation of {stock_name}\'s Closing value')
+    axes[r_idx, c_idx].set_ylabel('ACF value')
     if c_idx == 1: # index of 2nd column
         c_idx = 0
         r_idx += 1
     else:
         c_idx += 1
+plt.subplots_adjust(left=0.1,
+                    bottom=0.1,
+                    right=0.9,
+                    top=0.9,
+                    wspace=0.1,
+                    hspace=0.7)
 plt.show()
 
 
