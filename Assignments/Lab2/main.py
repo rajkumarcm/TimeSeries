@@ -59,6 +59,7 @@ acf(wn, max_lag=20)
 
 # Q3. c
 # Write down your observations about the ACF plot of stationary dataset.
+# This is answered in the final report and will be attached for the submission.
 
 # Q4.
 from datetime import date
@@ -105,7 +106,7 @@ nrow = 3
 ncol = 2
 r_idx = 0
 c_idx = 0
-for stock_name, stock in zip(stocks_name, stocks):
+for stock_name, stock_sym in zip(stocks_name, stocks):
     close_val = close_df.loc[:, stock_sym]
     close_val.dropna(inplace=True)
     acf(close_val.to_numpy(), max_lag=50, ax=axes[r_idx, c_idx])
@@ -125,7 +126,7 @@ plt.subplots_adjust(left=0.1,
                     hspace=0.7)
 plt.show()
 
-
+# Q5 is answered in the final report and will be attached for submission.
 
 
 
