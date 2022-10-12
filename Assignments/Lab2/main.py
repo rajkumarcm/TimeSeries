@@ -128,9 +128,34 @@ plt.show()
 
 # Q5 is answered in the final report and will be attached for submission.
 
+# Just some experiment to generate a non-stationary signal
+np.random.seed(0)
+noise = np.random.normal(0, 1, 100)
+y = []
+for i in range(100):
+    y.append(np.sum(noise[:(i+1)]))
 
-
-
+y_diff = pd.Series(y).diff(periods=1)
+fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+axes[0, 0].plot(y)
+axes[0, 0].set_title('NonStationary signal')
+axes[0, 0].set_xlabel('Sample')
+axes[0, 0].set_ylabel('Noise')
+axes[0, 0].grid(True)
+acf(y, 50, ax=axes[0, 1])
+axes[0, 1].set_title('ACF of nonstationary signal')
+axes[0, 1].set_xlabel('Lag')
+axes[0, 1].set_ylabel('ACF value')
+axes[1, 0].plot(y_diff)
+axes[1, 0].set_title('Differenced nonstationary signal')
+axes[1, 0].set_xlabel('Sample')
+axes[1, 0].set_ylabel('Differenced value')
+axes[1, 0].grid(True)
+acf(y_diff[1:].values.reshape([-1]), max_lag=50, ax=axes[1, 1])
+axes[1,1].set_title('ACF of differenced nonstationary signal')
+axes[1, 1].set_xlabel('Lag')
+axes[1, 1].set_ylabel('ACF value')
+plt.show()
 
 
 
