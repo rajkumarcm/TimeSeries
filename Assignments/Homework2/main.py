@@ -7,7 +7,13 @@ import pandas as pd
 #%%
 # Question 2
 x = [112, 118, 132, 129, 121, 135, 148, 136, 119, 104, 118, 115, 126, 141]
-metrics = {}
+names = []
+tr_mse_list = []
+ts_mse_list = []
+tr_res_var_list = []
+ts_res_var_list = []
+q_list = []
+prediction_errors = {}
 
 def avg_forecast(x, tr_size):
     prediction = [x[0]]
@@ -27,10 +33,10 @@ def avg_forecast(x, tr_size):
     plt.legend()
     plt.show()
 
-    return prediction, np.mean(x[:tr_size])
+    return prediction[1:], np.mean(x[:tr_size])
 
 tr_size = 9
-forecast, mean_forecast = avg_forecast(x, tr_size)
+prediction, forecast = avg_forecast(x, tr_size)
 
 #%%
 # Question 3
@@ -38,18 +44,19 @@ def mse(y, y_pred):
     diff = np.subtract(y, y_pred)
     return 1/len(diff) * diff.T @ diff
 
-tr_y = x[1:tr_size]
-tr_pred = forecast
+# Deliberately set it to 2 so that all algorithms generalise to this starting point
+tr_y = x[2:tr_size]
+tr_pred = prediction
 tr_res = np.subtract(tr_y, tr_pred)
-tr_mse = 1 / len(tr_res) * tr_res.T @ tr_res
+tr_mse = 1/len(tr_res) * tr_res.T @ tr_res
 
 ts_y = x[tr_size:]
-ts_pred = [mean_forecast] * (len(x)-tr_size)
+ts_pred = [forecast] * (len(x) - tr_size)
 # I manually computed mse so that I can use the residuals later for computing the variance
 ts_res = np.subtract(ts_y, ts_pred)
-ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
+ts_mse = 1/len(ts_res) * ts_res.T @ ts_res
 
-pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
 
 #%%
 # Question 4
@@ -64,11 +71,11 @@ tr_res_var = 1/len(tr_res_diff_ms) * tr_res_diff_ms.T @ tr_res_diff_ms
 ts_res_diff_ms = ts_res - np.mean(ts_res)
 ts_res_var = 1/len(ts_res_diff_ms) * ts_res_diff_ms.T @ ts_res_diff_ms
 # ts_res_var = np.var(ts_res_diff)
-pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+# pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
 
 #%%
 # Question 5
-def acf(x, max_lag, ax=None):
+def acf(x, max_lag):
     def __acf(x, lag):
         acf_val = 0
         mu = np.mean(x)
@@ -92,7 +99,17 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-print(f'Q value: {Q}')
+# print(f'Q value: {Q}')
+
+#%% Log metrics
+
+names.append('Average')
+tr_mse_list.append(tr_mse)
+ts_mse_list.append(ts_mse)
+tr_res_var_list.append(tr_res_var)
+ts_res_var_list.append(ts_res_var)
+q_list.append(Q)
+prediction_errors['Average'] = tr_res
 
 #%%
 # Question 6
@@ -115,13 +132,13 @@ def naive_method(x, tr_size):
     plt.legend()
     plt.show()
 
-    return prediction, x[tr_size-1]
+    return prediction[1:], x[tr_size-1]
 # naive_method(x, tr_size)
 
 #%%
 # Step 3
 prediction, naive_forecast = naive_method(x, tr_size)
-tr_y = x[1:tr_size]
+tr_y = x[2:tr_size]
 tr_pred = prediction
 tr_res = np.subtract(tr_y, prediction)
 tr_mse = 1 / len(tr_res) * tr_res.T @ tr_res
@@ -131,12 +148,12 @@ ts_pred = [naive_forecast] * (len(x)-tr_size)
 # I manually computed mse so that I can use the residuals later for computing the variance
 ts_res = np.subtract(ts_y, ts_pred)
 ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
-pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
 #%%
 # Step 4
 tr_res_var = np.var(tr_res)
 ts_res_var = np.var(ts_res)
-pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+# pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
 
 #%%
 # Step 5
@@ -148,7 +165,17 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-print(f'Q value: {Q}')
+# print(f'Q value: {Q}')
+
+#%% Log metrics
+
+names.append('Naive')
+tr_mse_list.append(tr_mse)
+ts_mse_list.append(ts_mse)
+tr_res_var_list.append(tr_res_var)
+ts_res_var_list.append(ts_res_var)
+q_list.append(Q)
+prediction_errors['Naive'] = tr_res
 
 #%%
 # Question 7 Step 2
@@ -190,9 +217,14 @@ ts_pred = dr_forecast[-(len(x)-tr_size):]
 # I manually computed mse so that I can use the residuals later for computing the variance
 ts_res = np.subtract(ts_y, ts_pred)
 ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
-pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
 
-#%% Step 4 - ACF and Q Value
+#%%
+# Step 4
+tr_res_var = np.var(tr_res)
+ts_res_var = np.var(ts_res)
+
+#%% Step 5 - ACF and Q Value
 
 acf_values = acf(tr_res, max_lag=5)
 
@@ -201,8 +233,17 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-print(f'Q value: {Q}')
+# print(f'Q value: {Q}')
 
+#%% Log metrics
+
+names.append('Drift')
+tr_mse_list.append(tr_mse)
+ts_mse_list.append(ts_mse)
+tr_res_var_list.append(tr_res_var)
+ts_res_var_list.append(ts_res_var)
+q_list.append(Q)
+prediction_errors['Drift'] = tr_res
 
 #%%
 # Question 8
@@ -233,20 +274,30 @@ for alpha in alphas:
     tr_res = np.subtract(tr_y, tr_pred)
     ts_res = np.subtract(ts_y, ts_pred)
 
-    # Compute the MSE on test set
-    ses_mse = 1/ts_size * ts_res.T @ ts_res
+    # Step 3 - Compute the MSE on the train and test set
+    ses_tr_mse = 1/len(tr_res) * tr_res.T @ tr_res
+    ses_ts_mse = 1/ts_size * ts_res.T @ ts_res
 
-    # Variance of prediction and forecast error
+    # Step 4 - Variance of prediction and forecast error
     ses_tr_var = np.var(tr_res)
     ses_ts_var = np.var(ts_res)
 
-    # ACF on training set
+    # Step 5 - ACF and Q on training set
     ses_acf = acf(tr_res, max_lag=5)
     # Ignore the first one
     ses_acf = ses_acf[1:]
     # Square and sum
     Q = len(tr_res) * ses_acf.T @ ses_acf
-    print(f'Q value: {Q}')
+    # print(f'Q value: {Q}')
+
+    # Log the metrics
+    names.append(f'SES a={alpha}')
+    tr_mse_list.append(ses_tr_mse)
+    ts_mse_list.append(ses_ts_mse)
+    tr_res_var_list.append(ses_tr_var)
+    ts_res_var_list.append(ses_ts_var)
+    q_list.append(Q)
+    prediction_errors[f'SES a={alpha}'] = tr_res
 
 #Plot
 fig, axes = plt.subplots(2, 2, figsize=(12, 8))
@@ -270,6 +321,52 @@ for alpha in alphas:
 
 plt.show()
 
+#%% Question 10 - Display the results
+
+metrics_df = pd.DataFrame({'Prediction MSE':tr_mse_list, 'Forecast MSE':ts_mse_list,
+                          'Pred. Var':tr_res_var_list, 'Forec. Var':ts_res_var_list,
+                           'Q':q_list}, index=names)
+print(metrics_df)
+
+#%% Question 11 - Plot ACF
+
+from utils import acf as plot_acf
+
+fig, axes = plt.subplots(4, 2, figsize=(13, 19))
+r_idx = 0
+c_idx = 0
+for method_name in names:
+    # prediction error of a method
+    prediction_err_m = prediction_errors[method_name]
+    plot_acf(prediction_err_m, max_lag=5, ax=axes[r_idx, c_idx])
+    axes[r_idx, c_idx].set_title(f'ACF of {method_name} pred.error')
+    if c_idx == 1:
+        c_idx = 0
+        r_idx += 1
+    else:
+        c_idx += 1
+plt.subplots_adjust(left=0.1,
+                    bottom=0.1,
+                    right=0.9,
+                    top=0.9,
+                    wspace=0.1,
+                    hspace=0.3)
+plt.show()
+
+#%% Question 12 - Answer discloesd in the report.
 
 
-# %%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
