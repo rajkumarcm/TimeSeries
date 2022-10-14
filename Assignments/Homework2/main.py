@@ -190,12 +190,10 @@ def drift_forecast(x, tr_size):
         if i <= tr_size:
             forecast.append(x[i-1] + ((x[i-1]-x[0])/(i-1)))
         else:
-            forecast.append(x[T] + (i-tr_size) * (straight_line_for_ts/(T)))
+            forecast.append(x[T] + (i-tr_size) * (straight_line_for_ts/T))
 
     plt.figure()
-    # plt.plot(list(range(1, tr_size+1)), x[:tr_size], '-b', label='Training data')
-    # Only for aesthetic purpose
-    plt.plot(list(range(1, tr_size + 2)), list(x[:tr_size])+[forecast[-ts_size]], '-b', label='Training data')
+    plt.plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
     # Prediction (not forecast) only starts from the second time-step
     plt.plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Test data')
     plt.plot(list(range(tr_size+1, len(x)+1)), forecast[-ts_size:], '-g', label='h-step prediction')
@@ -304,7 +302,7 @@ fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 r_idx = 0
 c_idx = 0
 for alpha in alphas:
-    axes[r_idx, c_idx].plot(list(range(1, tr_size+1)), tr_y, '-b', label='Training data')
+    axes[r_idx, c_idx].plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
     axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Test data')
     axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), [ses_pred_list[alpha]]*ts_size, '-g', label='Predicted data')
     axes[r_idx, c_idx].set_xlabel('Sample')
@@ -319,6 +317,12 @@ for alpha in alphas:
     else:
         c_idx += 1
 
+plt.subplots_adjust(left=0.1,
+                    bottom=0.1,
+                    right=0.9,
+                    top=0.9,
+                    wspace=0.1,
+                    hspace=0.3)
 plt.show()
 
 #%% Question 10 - Display the results
