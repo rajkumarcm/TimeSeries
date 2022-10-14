@@ -27,9 +27,10 @@ def avg_forecast(x, tr_size):
     plt.plot(list(range(tr_size+1)), x[:tr_size+1], '-b', label='Training data')
     plt.plot(list(range(tr_size, len(x))), x[tr_size:], '-', color='orange')
     plt.plot(list(range(tr_size, len(x))), [np.mean(x[:tr_size])]*(len(x)-tr_size), '-g', label='Test Forecast')
-    plt.xlabel('Sample')
+    plt.xlabel('Time')
     plt.ylabel('Value')
     plt.title('Average forecast method')
+    plt.grid(True)
     plt.legend()
     plt.show()
 
@@ -71,7 +72,7 @@ tr_res_var = 1/len(tr_res_diff_ms) * tr_res_diff_ms.T @ tr_res_diff_ms
 ts_res_diff_ms = ts_res - np.mean(ts_res)
 ts_res_var = 1/len(ts_res_diff_ms) * ts_res_diff_ms.T @ ts_res_diff_ms
 # ts_res_var = np.var(ts_res_diff)
-# pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+pd.DataFrame({'Avg method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
 
 #%%
 # Question 5
@@ -99,7 +100,7 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-# print(f'Q value: {Q}')
+print(f'Q value for Avg method: {Q}')
 
 #%% Log metrics
 
@@ -126,9 +127,10 @@ def naive_method(x, tr_size):
     plt.plot(list(range(tr_size+1)), x[:tr_size+1], '-b', label='Training data')
     plt.plot(list(range(tr_size, len(x))), x[tr_size:], '-', color='orange')
     plt.plot(list(range(tr_size, len(x))), [x[tr_size-1]]*(len(x)-tr_size), '-g', label='Test Forecast')
-    plt.xlabel('Sample')
+    plt.xlabel('Time')
     plt.ylabel('Value')
     plt.title('Naive forecast method')
+    plt.grid(True)
     plt.legend()
     plt.show()
 
@@ -153,7 +155,7 @@ ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
 # Step 4
 tr_res_var = np.var(tr_res)
 ts_res_var = np.var(ts_res)
-# pd.DataFrame({'Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+pd.DataFrame({'Naive method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
 
 #%%
 # Step 5
@@ -165,7 +167,7 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-# print(f'Q value: {Q}')
+print(f'Q value for Naive method: {Q}')
 
 #%% Log metrics
 
@@ -197,8 +199,9 @@ def drift_forecast(x, tr_size):
     # Prediction (not forecast) only starts from the second time-step
     plt.plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Test data')
     plt.plot(list(range(tr_size+1, len(x)+1)), forecast[-ts_size:], '-g', label='h-step prediction')
-    plt.xlabel('Sample')
+    plt.xlabel('Time')
     plt.ylabel('Value')
+    plt.grid(True)
     plt.title('Drift forecast method')
     plt.legend()
     plt.show()
@@ -221,6 +224,7 @@ ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
 # Step 4
 tr_res_var = np.var(tr_res)
 ts_res_var = np.var(ts_res)
+pd.DataFrame({'Drift method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
 
 #%% Step 5 - ACF and Q Value
 
@@ -231,7 +235,7 @@ acf_values = acf_values[1:]
 
 # Square and sum
 Q = len(tr_res) * acf_values.T @ acf_values
-# print(f'Q value: {Q}')
+print(f'Q value for Drift method: {Q}')
 
 #%% Log metrics
 
@@ -279,6 +283,7 @@ for alpha in alphas:
     # Step 4 - Variance of prediction and forecast error
     ses_tr_var = np.var(tr_res)
     ses_ts_var = np.var(ts_res)
+    pd.DataFrame({f'SES method a={alpha}: Variance in residuals': {'Prediction': tr_res_var, 'Forecast': ts_res_var}})
 
     # Step 5 - ACF and Q on training set
     ses_acf = acf(tr_res, max_lag=5)
@@ -286,7 +291,7 @@ for alpha in alphas:
     ses_acf = ses_acf[1:]
     # Square and sum
     Q = len(tr_res) * ses_acf.T @ ses_acf
-    # print(f'Q value: {Q}')
+    print(f'Q value for SES with alpha={alpha} is {Q}')
 
     # Log the metrics
     names.append(f'SES a={alpha}')
@@ -305,7 +310,7 @@ for alpha in alphas:
     axes[r_idx, c_idx].plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
     axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Test data')
     axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), [ses_pred_list[alpha]]*ts_size, '-g', label='Predicted data')
-    axes[r_idx, c_idx].set_xlabel('Sample')
+    axes[r_idx, c_idx].set_xlabel('Time')
     axes[r_idx, c_idx].set_ylabel('Value')
     axes[r_idx, c_idx].set_title(f'SES with alpha {alpha}')
     axes[r_idx, c_idx].grid(True)
