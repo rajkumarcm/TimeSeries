@@ -254,12 +254,12 @@ def ses(x, alpha):
     prediction = [x[0]] # prediction at time 1 is x[0]
     for i in range(1, tr_size): # 1 is the index of the second time-step
         prediction.append(a * x[i-1] + (1-a) * prediction[i-1])
-    return prediction
+    return prediction[2:]
 
 alphas = [0, 0.25, 0.75, 0.99]
 ts_size = len(x) - tr_size
 # y values
-tr_y = x[:tr_size]
+# tr_y = x[:tr_size]
 ts_y = x[tr_size:]
 ses_pred_list = {}
 for alpha in alphas:
@@ -273,7 +273,7 @@ for alpha in alphas:
     ts_pred = [ses_pred[-1]] * ts_size
 
     # Residuals
-    tr_res = np.subtract(tr_y, tr_pred)
+    tr_res = np.subtract(x[2:tr_size], tr_pred)
     ts_res = np.subtract(ts_y, ts_pred)
 
     # Step 3 - Compute the MSE on the train and test set
@@ -341,7 +341,7 @@ print(metrics_df)
 
 from utils import acf as plot_acf
 
-fig, axes = plt.subplots(4, 2, figsize=(13, 19))
+fig, axes = plt.subplots(4, 2, figsize=(15, 19))
 r_idx = 0
 c_idx = 0
 for method_name in names:
@@ -358,7 +358,7 @@ plt.subplots_adjust(left=0.1,
                     bottom=0.1,
                     right=0.9,
                     top=0.9,
-                    wspace=0.1,
+                    wspace=0.2,
                     hspace=0.3)
 plt.show()
 
