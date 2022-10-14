@@ -252,7 +252,7 @@ prediction_errors['Drift'] = tr_res
 def ses(x, alpha):
     a = alpha
     prediction = [x[0]] # prediction at time 1 is x[0]
-    for i in range(1, tr_size): # 1 is the index of the second time-step
+    for i in range(1, tr_size+1): # 1 is the index of the second time-step
         prediction.append(a * x[i-1] + (1-a) * prediction[i-1])
     return prediction[2:]
 
@@ -269,7 +269,7 @@ for alpha in alphas:
     ses_pred_list[alpha] = ses_pred[-1]
 
      # Prediction - y_hat
-    tr_pred = ses_pred[:tr_size]
+    tr_pred = ses_pred[:-1]
     ts_pred = [ses_pred[-1]] * ts_size
 
     # Residuals
