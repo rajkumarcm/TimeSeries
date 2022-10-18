@@ -24,9 +24,9 @@ def avg_forecast(x, tr_size):
         pass
 
     plt.figure()
-    plt.plot(list(range(tr_size+1)), x[:tr_size+1], '-b', label='Training data')
-    plt.plot(list(range(tr_size, len(x))), x[tr_size:], '-', color='orange')
-    plt.plot(list(range(tr_size, len(x))), [np.mean(x[:tr_size])]*(len(x)-tr_size), '-g', label='Test Forecast')
+    plt.plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
+    plt.plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Testing data')
+    plt.plot(list(range(tr_size+1, len(x)+1)), [np.mean(x[:tr_size])]*(len(x)-tr_size), '-g', label='h-step prediction')
     plt.xlabel('Time')
     plt.ylabel('Value')
     plt.title('Average forecast method')
@@ -57,7 +57,7 @@ ts_pred = [forecast] * (len(x) - tr_size)
 ts_res = np.subtract(ts_y, ts_pred)
 ts_mse = 1/len(ts_res) * ts_res.T @ ts_res
 
-# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+print(pd.DataFrame({'Average forecast MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}}))
 
 #%%
 # Question 4
@@ -72,7 +72,7 @@ tr_res_var = 1/len(tr_res_diff_ms) * tr_res_diff_ms.T @ tr_res_diff_ms
 ts_res_diff_ms = ts_res - np.mean(ts_res)
 ts_res_var = 1/len(ts_res_diff_ms) * ts_res_diff_ms.T @ ts_res_diff_ms
 # ts_res_var = np.var(ts_res_diff)
-pd.DataFrame({'Avg method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+print(pd.DataFrame({'Avg method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}}))
 
 #%%
 # Question 5
@@ -124,9 +124,9 @@ def naive_method(x, tr_size):
         pass
 
     plt.figure()
-    plt.plot(list(range(tr_size+1)), x[:tr_size+1], '-b', label='Training data')
-    plt.plot(list(range(tr_size, len(x))), x[tr_size:], '-', color='orange')
-    plt.plot(list(range(tr_size, len(x))), [x[tr_size-1]]*(len(x)-tr_size), '-g', label='Test Forecast')
+    plt.plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
+    plt.plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Testing data')
+    plt.plot(list(range(tr_size+1, len(x)+1)), [x[tr_size-1]]*(len(x)-tr_size), '-g', label='h-step prediction')
     plt.xlabel('Time')
     plt.ylabel('Value')
     plt.title('Naive forecast method')
@@ -150,12 +150,12 @@ ts_pred = [naive_forecast] * (len(x)-tr_size)
 # I manually computed mse so that I can use the residuals later for computing the variance
 ts_res = np.subtract(ts_y, ts_pred)
 ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
-# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+print(pd.DataFrame({'Naive method MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}}))
 #%%
 # Step 4
 tr_res_var = np.var(tr_res)
 ts_res_var = np.var(ts_res)
-pd.DataFrame({'Naive method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+print(pd.DataFrame({'Naive method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}}))
 
 #%%
 # Step 5
@@ -218,13 +218,13 @@ ts_pred = dr_forecast[-(len(x)-tr_size):]
 # I manually computed mse so that I can use the residuals later for computing the variance
 ts_res = np.subtract(ts_y, ts_pred)
 ts_mse = 1 / len(ts_res) * ts_res.T @ ts_res
-# pd.DataFrame({'MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}})
+print(pd.DataFrame({'Drift method MSE':{'Prediction':tr_mse, 'Forecast':ts_mse}}))
 
 #%%
 # Step 4
 tr_res_var = np.var(tr_res)
 ts_res_var = np.var(ts_res)
-pd.DataFrame({'Drift method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}})
+print(pd.DataFrame({'Drift method: Variance in residuals':{'Prediction':tr_res_var, 'Forecast':ts_res_var}}))
 
 #%% Step 5 - ACF and Q Value
 
@@ -309,7 +309,7 @@ c_idx = 0
 for alpha in alphas:
     axes[r_idx, c_idx].plot(list(range(1, tr_size+2)), x[:tr_size+1], '-b', label='Training data')
     axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), x[tr_size:], '-', color='orange', label='Test data')
-    axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), [ses_pred_list[alpha]]*ts_size, '-g', label='Predicted data')
+    axes[r_idx, c_idx].plot(list(range(tr_size+1, len(x)+1)), [ses_pred_list[alpha]]*ts_size, '-g', label='h-step prediction')
     axes[r_idx, c_idx].set_xlabel('Time')
     axes[r_idx, c_idx].set_ylabel('Value')
     axes[r_idx, c_idx].set_title(f'SES with alpha {alpha}')
