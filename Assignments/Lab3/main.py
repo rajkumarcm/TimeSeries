@@ -122,11 +122,12 @@ def backwise_reg(df_train, y_train, target):
     filtered_cnames = np.setdiff1d(cnames, ['bias_c']+target)
     ignored_cnames = []
     while curr_value > 0.05 + 1e-3:
-        prev_value = curr_value
-
         X_tr_subset = df_train[['bias_c'] + list(filtered_cnames)]
         # X_ts_subset = df_test[['bias_c'] + list(np.setdiff1d(filtered_cnames, cname))]
         ols = OLS(y_train.reshape([-1]), X_tr_subset).fit()
+        aic = ols.aic
+        bic = ols.bic
+        adj_r2 = ols.rsquared_adj
 
         max_pval_idx = ols.pvalues.iloc[1:].argmax()
         curr_value = ols.pvalues.iloc[1:][max_pval_idx]
@@ -136,6 +137,18 @@ def backwise_reg(df_train, y_train, target):
             return ignored_cnames, filtered_cnames, final_ols
 
         ignore_col = ols.pvalues.iloc[1:].index[max_pval_idx]
+        ##--------- Check for improvement
+        tmp_filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
+        tmp_X = df_train[['bias_c'] + list(tmp_filtered_cnames)]
+        tmp_ols = OLS(y_train.reshape([-1]), tmp_X).fit()
+        new_adj_r2 = tmp_ols.rsquared_adj
+        new_bic = tmp_ols.bic
+        new_aic = tmp_ols.aic
+        if (new_adj_r2 < adj_r2 and np.abs(new_adj_r2 - adj_r2) > 2e-2) or new_bic > bic or new_aic > aic:
+            final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
+            return ignored_cnames, filtered_cnames, final_ols
+        ##--------
+
         ignored_cnames.append(ignore_col)
         filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
     final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
@@ -154,16 +167,32 @@ def feature_select_vif(df_train, target):
     ignored_cols = []
     while curr_value > 5:
         X_tr_subset = df_train[['bias_c'] + list(filtered_cnames)]
-        vif_vals = pd.DataFrame([{'Variable':X_tr_subset.columns[i], 'VIF':VIF(X_tr_subset, i)} for i in range((X_tr_subset.shape[1])) if VIF(X_tr_subset, i) > 2])
+        vif_vals = pd.DataFrame([{'Variable':X_tr_subset.columns[i], 'VIF':VIF(X_tr_subset, i)} for i in range((X_tr_subset.shape[1])) if VIF(X_tr_subset, i) > 3])
         if vif_vals.shape[0] > 1:
             curr_value = vif_vals.VIF.iloc[1:].max()
             max_vif_idx = vif_vals.VIF.iloc[1:].argmax()
             ignore_col = vif_vals.Variable.iloc[1:].iloc[max_vif_idx]
+            ols = OLS(y_train.reshape([-1]), X_tr_subset).fit()
+            aic = ols.aic
+            bic = ols.bic
+            adj_r2 = ols.rsquared_adj
+
         else:
             final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
             return filtered_cnames, ignored_cols, final_ols
 
-        if curr_value > 5:
+        if curr_value > 3:
+            ##--------- Check for improvement
+            tmp_filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
+            tmp_X = df_train[['bias_c'] + list(tmp_filtered_cnames)]
+            tmp_ols = OLS(y_train.reshape([-1]), tmp_X).fit()
+            new_adj_r2 = tmp_ols.rsquared_adj
+            new_bic = tmp_ols.bic
+            new_aic = tmp_ols.aic
+            if new_adj_r2 < adj_r2 and np.abs(new_adj_r2 - adj_r2) > 2e-2:
+                final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
+                return ignored_cols, filtered_cnames, final_ols
+            ##--------
             filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
             ignored_cols.append(ignore_col)
 
@@ -202,7 +231,7 @@ plt.plot(tr_pred, '-m', label='Prediction')
 plt.plot(range(len(y_train), len(y_train)+len(y_test)), y_test.reshape([-1])-1200, '-', color='orange', label='Test data')
 # plt.plot(range(len(y_train), len(y_train)+len(y_test)), y_test-1200, '-', color='orange', label='Test data')
 plt.plot(range(len(y_train), len(y_train)+len(y_test)), ts_pred-1200, '-g', label='Forecast')
-plt.xlabel('Sample')
+plt.xlabel('T')
 plt.ylabel('Value')
 plt.title('OLS Prediction')
 plt.legend()
@@ -219,6 +248,8 @@ acf(tr_pred_error, max_lag=20)
 # Unreasonable question.
 # T-test
 r = np.zeros_like(best_model.params)
+r[:] = 1
+r[0] = -1
 ttest = best_model.t_test(r_matrix=r)
 print(ttest)
 
@@ -262,7 +293,7 @@ plt.figure()
 plt.plot(tr_pred, '-m', label='Prediction')
 # plt.plot(range(len(y_train), len(y_train)+len(y_test)), y_test-1200, '-', color='orange', label='Test data')
 plt.plot(range(len(y_train), len(y_train)+len(y_test)), ts_pred-1200, '-g', label='Forecast')
-plt.xlabel('Sample')
+plt.xlabel('T')
 plt.ylabel('Value')
 plt.title('OLS Prediction')
 plt.legend()
