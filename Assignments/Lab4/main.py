@@ -17,7 +17,7 @@ T = 100
 e = np.random.normal(loc=mean, scale=std, size=T)
 _, y = dlsim(system, e)
 plt.figure()
-sns.lineplot(list(range(T)), y[:, 0])
+plt.plot(list(range(T)), y[:, 0])
 plt.xlabel('Time (t)')
 plt.ylabel('Amplitude')
 plt.title('AR(2) process')
@@ -48,7 +48,7 @@ print(f'Experimental mean of y with 10000 samples: {mean_10000}')
 print(f'Experimental variance of y with 10000 samples: {var_10000}')
 
 #%% Q1.e
-pd.DataFrame({'theoretical':{'mean':1/3, 'variance':1/0.71},
+pd.DataFrame({'theoretical':{'mean':2/0.3, 'variance':0.8/0.468},
               'experimental_1000':{'mean':mean_1000, 'variance':var_1000},
               'experimental_10000':{'mean':mean_10000, 'variance':var_10000}
               })
@@ -100,7 +100,7 @@ print(f'Experimental mean of y with 10000 samples: {mean_10000}')
 print(f'Experimental variance of y with 10000 samples: {var_10000}')
 
 #%% Q2.e
-pd.DataFrame({'theoretical':{'mean':1/3, 'variance':1/0.71},
+pd.DataFrame({'theoretical':{'mean':3, 'variance':1.17},
               'experimental_1000':{'mean':mean_1000, 'variance':var_1000},
               'experimental_10000':{'mean':mean_10000, 'variance':var_10000}
               })
@@ -150,9 +150,18 @@ print(f'Experimental mean of y with 10000 samples: {mean_10000}')
 print(f'Experimental variance of y with 10000 samples: {var_10000}')
 
 #%% Q3.e
-pd.DataFrame({'theoretical':{'mean':1/3, 'variance':1/0.71},
+pd.DataFrame({'theoretical':{'mean':10, 'variance':3},
               'experimental_1000':{'mean':mean_1000, 'variance':var_1000},
               'experimental_10000':{'mean':mean_10000, 'variance':var_10000}
               })
 
 
+#%%
+lags = [20, 40, 80]
+corr = Corr()
+fig, axes = plt.subplots(len(lags), 1, figsize=(12, 9))
+for i, lag in enumerate(lags):
+    corr.acf(x=y, max_lag=lag, ax=axes[i])
+    axes[i].set_title(f'ACF of ARMA(2,2) with lag {lag}')
+plt.tight_layout()
+plt.show()
