@@ -10,22 +10,22 @@ import re
 np.random.seed(123)
 
 #%%
-ar = [1, 0.5]
-ma = [1]
-arma_process = ArmaProcess(ar, ma)
+# ar = [1, 0.5]
+# ma = [1]
+# arma_process = ArmaProcess(ar, ma)
 
 #%% Q1.
 def arma_generate_data():
     T = int(input('Enter the number of data samples'))
-    mu = float(input('Enter the mean of white noise'))
-    var = float(input('Enter the variance of the white noise'))
-    std = np.sqrt(var)
+    mu_e = float(input('Enter the mean of white noise'))
+    var_e = float(input('Enter the variance of the white noise'))
+    std_e = np.sqrt(var_e)
     ar_coeffs = None
     ma_coeffs = None
     pattern = "[\-]*[0-9]+[\.0-9]*"
     while True:
         na = int(input('Enter the AR order'))
-        coeffs_txt = input('Enter the coefficients of AR - Separate them by commas')
+        coeffs_txt = input('Enter the coefficients of AR - Separate them by commas. Note: You should include 1 for y(t)')
         ar_coeffs = re.findall(pattern, coeffs_txt)
         ar_coeffs = list(map(lambda x: float(x), ar_coeffs))
         if (len(ar_coeffs) == na + 1):
@@ -33,14 +33,15 @@ def arma_generate_data():
 
     while True:
         nb = int(input('Enter the MA order'))
-        coeffs_txt = input('Enter the coefficients of MA - Separate them by commas')
+        coeffs_txt = input('Enter the coefficients of MA - Separate them by commas. Note: You should include 1 for e(t)')
         ma_coeffs = re.findall(pattern, coeffs_txt)
         ma_coeffs = list(map(lambda x: float(x), ma_coeffs))
         if (len(ma_coeffs) == nb + 1):
             break
 
     arma_process = ArmaProcess(ar_coeffs, ma_coeffs)
-    return arma_process.generate_sample(T, scale=std) + mu
+    mu_y = (mu_e * np.sum(ma_coeffs))/(1 + np.sum(np.array(ar_coeffs[1:])))
+    return arma_process.generate_sample(T, scale=std_e) + mu_y, arma_process
 #
 # data = arma_generate_data()
 # print('breakpoint...')
@@ -49,7 +50,6 @@ def arma_generate_data():
 # Q2 and 4 combined. GPAC table
 
 def gpac_table(acf_vals, na, nb):
-
     def gpac(acf_vals, j, k):
         num = np.zeros([k, k])
         for p in range((k - 1)):  # for all columns except the last one
@@ -84,15 +84,15 @@ def gpac_table(acf_vals, na, nb):
 
 def arma_gpac(max_j, max_k, plot=True):
     T = int(input('Enter the number of data samples'))
-    mu = float(input('Enter the mean of white noise'))
-    var = float(input('Enter the variance of the white noise'))
-    std = np.sqrt(var)
+    mu_e = float(input('Enter the mean of white noise'))
+    var_e = float(input('Enter the variance of the white noise'))
+    std_e = np.sqrt(var_e)
     ar_coeffs = None
     ma_coeffs = None
     pattern = "[\-]*[0-9]+[\.0-9]*"
     while True:
         na = int(input('Enter the AR order'))
-        coeffs_txt = input('Enter the coefficients of AR - Separate them by commas')
+        coeffs_txt = input('Enter the coefficients of AR - Separate them by commas. Note: You should include 1 for y(t)')
         ar_coeffs = re.findall(pattern, coeffs_txt)
         ar_coeffs = list(map(lambda x: float(x), ar_coeffs))
         if(len(ar_coeffs)==na+1):
@@ -100,30 +100,73 @@ def arma_gpac(max_j, max_k, plot=True):
 
     while True:
         nb = int(input('Enter the MA order'))
-        coeffs_txt = input('Enter the coefficients of MA - Separate them by commas')
+        coeffs_txt = input('Enter the coefficients of MA - Separate them by commas. Note: You should include 1 for e(t)')
         ma_coeffs = re.findall(pattern, coeffs_txt)
         ma_coeffs = list(map(lambda x: float(x), ma_coeffs))
         if(len(ma_coeffs)==nb+1):
             break
 
     arma_process = ArmaProcess(ar_coeffs, ma_coeffs)
-    x = arma_process.generate_sample(T, scale=std) + mu
+    mu_y = (mu_e * np.sum(ma_coeffs)) / (1 + np.sum(np.array(ar_coeffs[1:])))
+    x = arma_process.generate_sample(T, scale=std_e) + mu_y
     acf_vals = arma_process.acf(lags=max_j+max_k+1)
     gpac_vals = gpac_table(acf_vals, max_k, max_j - 1)
     if plot:
         plt.figure()
         sns.heatmap(gpac_vals, annot=True)
+        plt.xticks(ticks=list(range(1, max_k+1)), labels=list(range(1, max_k+1)))
         plt.title('Generalized Partial Autocorrelation (GPAC) Table')
+        plt.xlabel('AR Order')
+        plt.ylabel('MA Order')
         plt.show()
-    return gpac_vals
+    return x, arma_process, gpac_vals
 
 # print('breakpoint...')
 
-#%% Q3 is the same as Q1, but need to be manually fed with different parameters. Hence the
-# result will be on the report.
+#%% Q3 and 5
 
-#%% Q5
-gpac_vals = arma_gpac(7, 7)
+# If you meant to ask manual method, here is the solution
+data_q3, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+
+#%% Q4. Generate theoretical ACF
+acf_vals = arma_process.acf(lags=15)
 
 #%% Q6
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+def ACF_PACF_Plot(y,lags):
+     acf = sm.tsa.stattools.acf(y, nlags=lags)
+     pacf = sm.tsa.stattools.pacf(y, nlags=lags)
+     fig = plt.figure()
+     plt.subplot(211)
+     plt.title('ACF/PACF of the raw data')
+     plot_acf(y, ax=plt.gca(), lags=lags)
+     plt.subplot(212)
+     plot_pacf(y, ax=plt.gca(), lags=lags)
+     fig.tight_layout(pad=3)
+     plt.show()
+
+ACF_PACF_Plot(data_q3, lags=20)
+
+#%% Q7 and Q8
+data, arma_process = arma_generate_data()
+ArmaProcess
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
