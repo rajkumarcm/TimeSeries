@@ -1,6 +1,7 @@
 #%% Load the libraries
 import numpy as np
 import pandas as pd
+import matplotlib
 from matplotlib import pyplot as plt
 import seaborn as sns
 from os import chdir
@@ -37,19 +38,49 @@ axes[1].set_title('Last date in each state')
 fig.tight_layout()
 plt.show()
 
+#%% Drop columns
+"""
+We will aggregate the values from all address within a State as the pollutant values
+are not expected to vary by much.
+"""
+uspoll = uspoll.drop(columns=['State Code', 'County Code', 'Site Num',
+                              'Address', 'County', 'City'])
+
 #%% Replace NaN's in CO AQI
 co_aqi = uspoll[['State', 'Date Local', 'CO AQI']]\
                     .groupby(['State', 'Date Local'])\
                     .agg('max').reset_index()
 
+#%% Replace NaN's in SO2 AQI
+so2_aqi = uspoll[['State', 'Date Local', 'SO2 AQI']]\
+                .groupby(['State', 'Date Local'])\
+                .agg('max').reset_index()
+
+#%%
+o3_aqi = uspoll[['State', 'Date Local', 'O3 AQI']]\
+                .groupby(['State', 'Date Local'])\
+                .agg('max').reset_index()
+
+#%%
+no2_aqi = uspoll[['State', 'Date Local', 'NO2 AQI']]\
+                .groupby(['State', 'Date Local'])\
+                .agg('max').reset_index()
+
 #%%
 non_cat_vars = uspoll.dtypes[uspoll.dtypes != 'object']
-uspoll_agg = uspoll[list(np.setdiff1d(non_cat_vars.index.values, 'CO AQI')) + ['State']]\
+aqi_vars = ['CO AQI', 'NO2 AQI', 'SO2 AQI', 'O3 AQI']
+uspoll_agg = uspoll[list(np.setdiff1d(non_cat_vars.index.values, aqi_vars)) + ['State']]\
                     .groupby(['State', 'Date Local'])\
                     .agg('mean').reset_index()
 
 #%%
 uspoll_agg = pd.merge(uspoll_agg, co_aqi, on=['State', 'Date Local'],
+                      how='inner')
+uspoll_agg = pd.merge(uspoll_agg, so2_aqi, on=['State', 'Date Local'],
+                      how='inner')
+uspoll_agg = pd.merge(uspoll_agg, no2_aqi, on=['State', 'Date Local'],
+                      how='inner')
+uspoll_agg = pd.merge(uspoll_agg, o3_aqi, on=['State', 'Date Local'],
                       how='inner')
 
 #%% List of States that are maximally sized
@@ -76,65 +107,110 @@ uspoll_state = pd.merge(left=original_date_range, right=uspoll_state, how='left'
 
 #%%
 missing_dates = uspoll_state.loc[uspoll_state["CO AQI"].isnull(), "Date Local"]
-print(f'List of dates at which values are missing:\n'
+print(f'List of dates for which values are missing:\n'
       f'{missing_dates}')
 
 #%% Let's plot, and visualize the data until the point in time the values are incomplete
-subset_nmissing_co_aqi = uspoll_state.loc[uspoll_state['Date Local'] < missing_dates.min(), ['Date Local', 'CO AQI']]
-plt.figure()
-subset_nmissing_co_aqi['CO AQI'].plot()
+subset_nmissing = uspoll_state.loc[uspoll_state['Date Local'] < missing_dates.min(),
+                                          ['Date Local'] + aqi_vars]\
+                              .set_index('Date Local')\
+                              .asfreq('D')
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 6))
+axes[0, 0].plot(subset_nmissing['CO AQI'])
+axes[0, 0].set_ylabel('CO AQI')
+axes[0, 0].set_title('Carbon Monoxide Air Quality Index')
+axes[0, 1].plot(subset_nmissing['NO2 AQI'])
+axes[0, 1].set_ylabel('NO2 AQI')
+axes[0, 1].set_title('Nitrogen Dioxide Air Quality Index')
+axes[1, 0].plot(subset_nmissing['SO2 AQI'])
+axes[1, 0].set_ylabel('SO2 AQI')
+axes[1, 0].set_title('Sulfur Dioxide Air Quality Index')
+axes[1, 1].plot(subset_nmissing['O3 AQI'])
+axes[1, 1].set_ylabel('O3 AQI')
+axes[1, 1].set_title('Ground Level Ozone Air Quality Index')
+fig.tight_layout()
 plt.show()
 
-
 #%%
-subset_nmissing_co_aqi = subset_nmissing_co_aqi.set_index('Date Local').asfreq('D')
+
+co_aqi = subset_nmissing['CO AQI']
+so2_aqi = subset_nmissing['SO2 AQI']
+o3_aqi = subset_nmissing['O3 AQI']
+no2_aqi = subset_nmissing['NO2 AQI']
 
 #%%
 mse_list = [np.Inf, np.Inf]
-for i in range(2, 380):
-    ets = ETS.ExponentialSmoothing(subset_nmissing_co_aqi, trend=None, damped_trend=False,
-                                   seasonal="mul", seasonal_periods=i).fit()
-    y_true = subset_nmissing_co_aqi.reset_index(drop=True).values.reshape([-1])
-    y_pred = ets.fittedvalues.reset_index(drop=True).values.reshape([-1])
+n = co_aqi.shape[0]
+train_ratio = 0.7
+train_len = int(train_ratio * n)
+co_train, co_test = subset_nmissing['CO AQI'].iloc[:train_len], \
+                    subset_nmissing['CO AQI'].iloc[train_len:]
+
+for i in range(2, 400):
+    ets_co = ETS.ExponentialSmoothing(co_train, trend=None, damped_trend=False,
+                                      seasonal="mul", seasonal_periods=i).fit()
+    # y_true = co_train.reset_index(drop=True).values.reshape([-1])
+    # y_pred = ets_co.fittedvalues.reset_index(drop=True).values.reshape([-1])
+    y_true = co_test.reset_index(drop=True).values.reshape([-1])
+    y_pred = ets_co.forecast(steps=co_test.shape[0])
     diff = y_true - y_pred
     mse = 1/len(diff) * (diff.T @ diff)
     mse_list.append(mse)
 
 #%%
-seasonality_period = np.argmin(mse_list) + 1 # + 1 due to indices starting from 0
+seasonality_period = np.argmin(mse_list) + 1  # + 1 due to indices starting from 0
 
-ets_co_aqi = ETS.ExponentialSmoothing(subset_nmissing_co_aqi, trend=None, damped_trend=False,
-          seasonal="mul", seasonal_periods=seasonality_period).fit()
-imputed_data = ets_co_aqi.forecast(steps=missing_dates.shape[0])
+ets_co = ETS.ExponentialSmoothing(subset_nmissing['CO AQI'], trend=None, damped_trend=False,
+                                  seasonal="mul", seasonal_periods=seasonality_period).fit()
+co_imputed_data = ets_co.forecast(steps=missing_dates.shape[0])
 
 plt.figure()
-plt.plot(subset_nmissing_co_aqi.reset_index(drop=True), '-b')
-plt.plot(ets_co_aqi.fittedvalues.reset_index(drop=True), '-r')
+plt.plot(subset_nmissing['CO AQI'].reset_index(drop=True), '-b')
+plt.plot(ets_co.fittedvalues.reset_index(drop=True), '-r', alpha=0.8)
+plt.ylabel('CO AQI')
+plt.title('Carbon Monoxide Air Quality Index after Imputation')
 plt.show()
-
-#%% Impute the NO AQI
-subset_nmissing_so2_aqi = uspoll_state.loc[uspoll_state['Date Local'] < missing_dates.min(), ['Date Local', 'SO2 AQI']]
 
 #%%
-plt.figure()
-subset_nmissing_so2_aqi['SO2 AQI'].plot()
-# plt.xlim(['2000-01-01', '2000-04-01'])
-plt.show()
+# second_part_nmissing_co = uspoll_state.loc[uspoll_state['Date Local'] > missing_dates.max(),
+#                                            ['Date Local', 'CO AQI']]
+# second_part_nmissing_co = second_part_nmissing_co.reset_index(drop=True).set_index('Date Local')
+# imputed_data_o3_aqi_mod = pd.DataFrame({'Date Local':missing_dates.reset_index(drop=True),
+#                                         'O3 AQI':imputed_data_o3_aqi.reset_index()[0]})
+# imputed_data_o3_aqi_mod = imputed_data_o3_aqi_mod.set_index('Date Local')
+# collated_o3_aqi = pd.concat([subset_nmissing_o3_aqi,
+#                              imputed_data_o3_aqi_mod, second_part_nmissing_o3_aqi], axis=0)
 
-#%% O3 subset and plot
-subset_nmissing_o3_aqi = uspoll_state.loc[uspoll_state['Date Local'] < missing_dates.min(), ['Date Local', 'O3 AQI']]
-subset_nmissing_o3_aqi = subset_nmissing_o3_aqi.set_index('Date Local').asfreq('D')
-plt.figure()
-subset_nmissing_o3_aqi['O3 AQI'].plot()
-plt.show()
+uspoll_state = uspoll_state.set_index('Date Local').asfreq('D')
+missing_idx_start = missing_dates.reset_index()['Date Local'].min()
+missing_idx_end = missing_dates.reset_index()['Date Local'].max()
+# reset_index()[0] should return CO AQI col
+uspoll_state.loc[missing_idx_start:missing_idx_end, 'CO AQI'] = co_imputed_data.reset_index()[0].values
+uspoll_state.loc[missing_idx_start:missing_idx_end, 'State'] = 'Arizona'
 
-#%% Holts Winter Optimization Loop
+#%%
+# stl = STL(o3_aqi, period=13)
+# res = stl.fit()
+# R = res.resid
+# T = res.trend
+# S = res.seasonal
+# strength_of_trend = np.max([0, (1-(R.var()/(T+R).var()))])
+# strength_of_seasonality = np.max([0, (1-(R.var()/(S+R).var()))])
+# print(f'Strength of the trend {100 * strength_of_trend:.2f}')
+# print(f'Strength of the seasonality {100 * strength_of_seasonality:.2f}')
+
+
+#%% Impute the O3 AQI
+#Holts Winter Optimization Loop
 
 mse_list_o3_aqi = [np.Inf, np.Inf]
-for i in range(2, 380):
-    ets_o3 = ETS.ExponentialSmoothing(subset_nmissing_o3_aqi, trend=None, damped_trend=False,
-                                      seasonal="mul", seasonal_periods=i).fit()
-    y_true = subset_nmissing_o3_aqi.reset_index(drop=True).values.reshape([-1])
+o3_train, o3_test = subset_nmissing['CO AQI'].iloc[:train_len], \
+                    subset_nmissing['CO AQI'].iloc[train_len:]
+for i in range(2, 400):
+    ets_o3 = ETS.ExponentialSmoothing(o3_aqi, trend=None, damped_trend=False,
+                                      seasonal="additive", seasonal_periods=i).fit()
+    y_true = o3_aqi.reset_index(drop=True).values.reshape([-1])
     y_pred = ets_o3.fittedvalues.reset_index(drop=True).values.reshape([-1])
     diff = y_true - y_pred
     mse = 1/len(diff) * (diff.T @ diff)
