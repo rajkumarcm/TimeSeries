@@ -1,15 +1,15 @@
 #%% Load the libraries
+from matplotlib import pylab
 import numpy as np
 import pandas as pd
-import matplotlib
 from matplotlib import pyplot as plt
-import seaborn as sns
 from os import chdir
 from os.path import abspath, join
 from statsmodels.tsa import holtwinters as ETS
 from Utilities.WhitenessTest import WhitenessTest as WT
 from Utilities.Correlation import Correlation as Corr
 from statsmodels.tsa.seasonal import STL
+import seaborn as sns
 
 #%% Load the data
 uspoll = pd.read_csv('pollution_us_2000_2016.csv', header=0, index_col=0)
@@ -56,17 +56,22 @@ so2_aqi = uspoll[['State', 'Date Local', 'SO2 AQI']]\
                 .groupby(['State', 'Date Local'])\
                 .agg('max').reset_index()
 
-#%%
+#%% Replace NaN's in O3 AQI
 o3_aqi = uspoll[['State', 'Date Local', 'O3 AQI']]\
                 .groupby(['State', 'Date Local'])\
                 .agg('max').reset_index()
 
-#%%
+#%% Replace NaN's in NO2 AQI
 no2_aqi = uspoll[['State', 'Date Local', 'NO2 AQI']]\
                 .groupby(['State', 'Date Local'])\
                 .agg('max').reset_index()
 
 #%%
+"""
+We are aggregating values other than AQI since columns other than AQI have multiple records
+for the same day, and the differences between the instances are subtle. Hence, an average of those
+values would yield an equally sized daily data.
+"""
 non_cat_vars = uspoll.dtypes[uspoll.dtypes != 'object']
 aqi_vars = ['CO AQI', 'NO2 AQI', 'SO2 AQI', 'O3 AQI']
 uspoll_agg = uspoll[list(np.setdiff1d(non_cat_vars.index.values, aqi_vars)) + ['State']]\
@@ -74,6 +79,12 @@ uspoll_agg = uspoll[list(np.setdiff1d(non_cat_vars.index.values, aqi_vars)) + ['
                     .agg('mean').reset_index()
 
 #%%
+"""
+Adding back all the AQI columns that we ignored in the aggregation step (last step) since
+under the multiple records each day, only one of them has the value while the rest were filled
+by NaN. This is why removed NaN prior to the aggregation, and now we join all AQIs with the
+averaged data frame. 
+"""
 uspoll_agg = pd.merge(uspoll_agg, co_aqi, on=['State', 'Date Local'],
                       how='inner')
 uspoll_agg = pd.merge(uspoll_agg, so2_aqi, on=['State', 'Date Local'],
@@ -98,6 +109,13 @@ uspoll_state = uspoll_agg.loc[uspoll_agg.State == chosen_state]
 print(uspoll_state.head())
 
 #%%
+"""
+We do an left outer join between the filtered uspoll_state data frame and the 
+data frame that contain only the dates between the start and last date found in uspoll_state.
+Just in case there are dates that have missing values under any column. This would allow us
+to identify the dates on which no information was registered. Perhaps we could use forecasting
+techniques to impute the data.
+"""
 original_date_range = pd.date_range(start='2000-01-01', end='2016-03-31',
                                     freq='D', inclusive='both')
 original_date_range = pd.DataFrame({'Date Local':original_date_range})
@@ -133,14 +151,20 @@ fig.tight_layout()
 plt.show()
 
 #%%
-
+# acronym nmissing correspond to not missing
 co_aqi = subset_nmissing['CO AQI']
 so2_aqi = subset_nmissing['SO2 AQI']
 o3_aqi = subset_nmissing['O3 AQI']
 no2_aqi = subset_nmissing['NO2 AQI']
 
 #%%
-mse_list = [np.Inf, np.Inf]
+
+""" --- FOR CO AQI
+Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the 
+seasonality period that yields the minimal MSE value.
+"""
+
+mse_list_co = [np.Inf, np.Inf]
 n = co_aqi.shape[0]
 train_ratio = 0.7
 train_len = int(train_ratio * n)
@@ -156,13 +180,20 @@ for i in range(2, 400):
     y_pred = ets_co.forecast(steps=co_test.shape[0])
     diff = y_true - y_pred
     mse = 1/len(diff) * (diff.T @ diff)
-    mse_list.append(mse)
+    mse_list_co.append(mse)
 
 #%%
-seasonality_period = np.argmin(mse_list) + 1  # + 1 due to indices starting from 0
+""" --- FOR CO AQI
+Using the seasonality period that produced the minimal MSE value, fit the data to the model as
+we did not retain the best model from the previous step.
+"""
+seasonality_period = np.argmin(mse_list_co) + 1  # + 1 due to indices starting from 0
 
 ets_co = ETS.ExponentialSmoothing(subset_nmissing['CO AQI'], trend=None, damped_trend=False,
                                   seasonal="mul", seasonal_periods=seasonality_period).fit()
+"""
+Use forecast method to extrapolate CO AQI to period the values were not registered.
+"""
 co_imputed_data = ets_co.forecast(steps=missing_dates.shape[0])
 
 plt.figure()
@@ -173,15 +204,9 @@ plt.title('Carbon Monoxide Air Quality Index after Imputation')
 plt.show()
 
 #%%
-# second_part_nmissing_co = uspoll_state.loc[uspoll_state['Date Local'] > missing_dates.max(),
-#                                            ['Date Local', 'CO AQI']]
-# second_part_nmissing_co = second_part_nmissing_co.reset_index(drop=True).set_index('Date Local')
-# imputed_data_o3_aqi_mod = pd.DataFrame({'Date Local':missing_dates.reset_index(drop=True),
-#                                         'O3 AQI':imputed_data_o3_aqi.reset_index()[0]})
-# imputed_data_o3_aqi_mod = imputed_data_o3_aqi_mod.set_index('Date Local')
-# collated_o3_aqi = pd.concat([subset_nmissing_o3_aqi,
-#                              imputed_data_o3_aqi_mod, second_part_nmissing_o3_aqi], axis=0)
-
+"""
+Now add the imputed values back to the CO AQI data frame
+"""
 uspoll_state = uspoll_state.set_index('Date Local').asfreq('D')
 missing_idx_start = missing_dates.reset_index()['Date Local'].min()
 missing_idx_end = missing_dates.reset_index()['Date Local'].max()
@@ -202,11 +227,16 @@ uspoll_state.loc[missing_idx_start:missing_idx_end, 'State'] = 'Arizona'
 
 
 #%% Impute the O3 AQI
-#Holts Winter Optimization Loop
+""" --- FOR O3 AQI
+Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the 
+seasonality period that yields the minimal MSE value.
+"""
 
 mse_list_o3_aqi = [np.Inf, np.Inf]
-o3_train, o3_test = subset_nmissing['CO AQI'].iloc[:train_len], \
-                    subset_nmissing['CO AQI'].iloc[train_len:]
+# I believe using the test data to check for minimum MSE is not required at this stage
+# as we are imputing just 5 values.
+# o3_train, o3_test = o3_aqi.iloc[:train_len], \
+#                     o3_aqi.iloc[train_len:]
 for i in range(2, 400):
     ets_o3 = ETS.ExponentialSmoothing(o3_aqi, trend=None, damped_trend=False,
                                       seasonal="additive", seasonal_periods=i).fit()
@@ -218,36 +248,137 @@ for i in range(2, 400):
 
 
 #%% O3 Holts Winter Seasonal Fit
+""" --- FOR O3 AQI
+Using the seasonality period that produced the minimal MSE value, fit the data to the model as
+we did not retain the best model from the previous step.
+"""
 seasonality_period_o3_aqi = np.argmin(mse_list_o3_aqi) + 1 # + 1 due to indices starting from 0
 
-ets_o3_aqi = ETS.ExponentialSmoothing(subset_nmissing_o3_aqi, trend=None, damped_trend=False,
+ets_o3_aqi = ETS.ExponentialSmoothing(o3_aqi, trend=None, damped_trend=False,
                seasonal="additive", seasonal_periods=seasonality_period_o3_aqi).fit()
+"""
+Use forecast method to extrapolate O3 AQI to period the values were not registered.
+"""
 imputed_data_o3_aqi = ets_o3_aqi.forecast(steps=missing_dates.shape[0])
 
 plt.figure()
-plt.plot(subset_nmissing_o3_aqi, '-b')
+plt.plot(o3_aqi, '-b')
 plt.plot(ets_o3_aqi.fittedvalues, '-r')
 plt.title('O3 Air Quality Index')
 plt.ylabel('Air Quality Index')
 plt.show()
 
 #%% O3 AQI Holt Winter Seasonal Imputation
-second_part_nmissing_o3_aqi = uspoll_state.loc[uspoll_state['Date Local'] > missing_dates.max(), ['Date Local', 'O3 AQI']]
-second_part_nmissing_o3_aqi = second_part_nmissing_o3_aqi.reset_index(drop=True).set_index('Date Local')
-imputed_data_o3_aqi_mod = pd.DataFrame({'Date Local':missing_dates.reset_index(drop=True),
-                                        'O3 AQI':imputed_data_o3_aqi.reset_index()[0]})
-imputed_data_o3_aqi_mod = imputed_data_o3_aqi_mod.set_index('Date Local')
-collated_o3_aqi = pd.concat([subset_nmissing_o3_aqi,
-                             imputed_data_o3_aqi_mod, second_part_nmissing_o3_aqi], axis=0)
+"""
+Now add the imputed values back to the O3 AQI data frame
+"""
+uspoll_state.loc[missing_idx_start:missing_idx_end, 'O3 AQI'] = imputed_data_o3_aqi.reset_index()[0].values
+
+#%% Impute the NO2 AQI
+""" --- FOR NO2 AQI
+Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the 
+seasonality period that yields the minimal MSE value.
+"""
+
+mse_list_no2_aqi = [np.Inf, np.Inf]
+
+for i in range(2, 400):
+    ets_no2 = ETS.ExponentialSmoothing(no2_aqi, trend=None, damped_trend=False,
+                                      seasonal="additive", seasonal_periods=i).fit()
+    y_true = no2_aqi.reset_index(drop=True).values.reshape([-1])
+    y_pred = ets_no2.fittedvalues.reset_index(drop=True).values.reshape([-1])
+    diff = y_true - y_pred
+    mse = 1/len(diff) * (diff.T @ diff)
+    mse_list_no2_aqi.append(mse)
 
 
+#%% NO2 Holts Winter Seasonal Fit
+""" --- FOR NO2 AQI
+Using the seasonality period that produced the minimal MSE value, fit the data to the model as
+we did not retain the best model from the previous step.
+"""
+seasonality_period_no2_aqi = np.argmin(mse_list_no2_aqi) + 1 # + 1 due to indices starting from 0
+
+ets_no2_aqi = ETS.ExponentialSmoothing(no2_aqi, trend=None, damped_trend=False,
+               seasonal="additive", seasonal_periods=seasonality_period_no2_aqi).fit()
+"""
+Use forecast method to extrapolate NO2 AQI to period the values were not registered.
+"""
+imputed_data_no2_aqi = ets_no2_aqi.forecast(steps=missing_dates.shape[0])
+
+plt.figure()
+plt.plot(no2_aqi, '-b')
+plt.plot(ets_no2_aqi.fittedvalues, '-r')
+plt.title('NO2 Air Quality Index')
+plt.ylabel('Air Quality Index')
+plt.show()
+
+#%% NO2 AQI Holt Winter Seasonal Imputation
+"""
+Now add the imputed values back to the NO2 AQI data frame
+"""
+uspoll_state.loc[missing_idx_start:missing_idx_end, 'NO2 AQI'] = imputed_data_no2_aqi.reset_index()[0].values
+
+#%% Impute the SO2 AQI
+""" --- FOR SO2 AQI
+Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the 
+seasonality period that yields the minimal MSE value.
+"""
+
+mse_list_so2_aqi = [np.Inf, np.Inf]
+
+for i in range(2, 400):
+    ets_so2 = ETS.ExponentialSmoothing(so2_aqi, trend=None, damped_trend=False,
+                                      seasonal="additive", seasonal_periods=i).fit()
+    y_true = so2_aqi.reset_index(drop=True).values.reshape([-1])
+    y_pred = ets_so2.fittedvalues.reset_index(drop=True).values.reshape([-1])
+    diff = y_true - y_pred
+    mse = 1/len(diff) * (diff.T @ diff)
+    mse_list_so2_aqi.append(mse)
+
+
+#%% SO2 Holts Winter Seasonal Fit
+""" --- FOR SO2 AQI
+Using the seasonality period that produced the minimal MSE value, fit the data to the model as
+we did not retain the best model from the previous step.
+"""
+seasonality_period_so2_aqi = np.argmin(mse_list_so2_aqi) + 1 # + 1 due to indices starting from 0
+
+ets_so2_aqi = ETS.ExponentialSmoothing(so2_aqi, trend=None, damped_trend=False,
+               seasonal="additive", seasonal_periods=seasonality_period_so2_aqi).fit()
+"""
+Use forecast method to extrapolate SO2 AQI to period the values were not registered.
+"""
+imputed_data_so2_aqi = ets_so2_aqi.forecast(steps=missing_dates.shape[0])
+
+plt.figure()
+plt.plot(so2_aqi, '-b')
+plt.plot(ets_so2_aqi.fittedvalues, '-r')
+plt.title('SO2 Air Quality Index')
+plt.ylabel('Air Quality Index')
+plt.show()
+
+#%% SO2 AQI Holt Winter Seasonal Imputation
+"""
+Now add the imputed values back to the SO2 AQI data frame
+"""
+uspoll_state.loc[missing_idx_start:missing_idx_end, 'SO2 AQI'] = imputed_data_so2_aqi.reset_index()[0].values
+
+#%%
+"""
+Weather Dataset is now included to aid in the process of regression.
+"""
 
 #%% Merge two dataframes
 weather_df = pd.read_csv('arizona_weather.csv', header=0)
 weather_df['Date Local'] = pd.to_datetime(weather_df['Date Local'])
-joined_df = pd.merge(left=weather_df, right=collated_o3_aqi.reset_index(), how='inner',
+joined_df = pd.merge(left=weather_df, right=uspoll_state.reset_index(), how='inner',
                      on='Date Local', sort=False)
 
+# %%
+"""
+CORRELATION AND WHITENESS TEST-----------------------------------------------------------------
+"""
 #%% Correlation plot
 
 fig = plt.figure(figsize=(15, 15))
@@ -257,19 +388,45 @@ plt.title('Correlation Plot', fontsize=20)
 fig.tight_layout()
 plt.show()
 
+
 #%%
-plt.figure(figsize=(12, 8))
-plt.plot(subset_nmissing_o3_aqi, '-b', label='Original Data')
-plt.plot(imputed_data_o3_aqi_mod, '-r', label='Imputed Data')
-plt.plot(second_part_nmissing_o3_aqi, '-b', label='Original Data')
-plt.ylabel('AQI Value')
-plt.title('Arizona Air Quality Index from 2000 - March 2016')
+wt = WT(joined_df['NO2 AQI'])
+wt.Plot_Rolling_Mean_Var(name='NO2 Air Quality Index')
+
+wt = WT(joined_df['CO AQI'])
+wt.Plot_Rolling_Mean_Var(name='CO Air Quality Index')
+
+wt = WT(joined_df['SO2 AQI'])
+wt.Plot_Rolling_Mean_Var(name='SO2 Air Quality Index')
+
+wt = WT(joined_df['O3 AQI'])
+wt.Plot_Rolling_Mean_Var(name='O3 Air Quality Index')
+
+#%%
+"""--------------------------------------------------------------------------
+Make the dependent variable(s) stationary
+--------------------------------------------------------------------------"""
+# CO AQI
+# stl = STL(endog=joined_df['CO AQI'], period=12).fit()
+# trend = stl.trend
+# seasonal = stl.seasonal
+# residual = stl.resid
+#
+# de_seasonal = trend * residual
+"""
+RESUME WORK HERE \/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\
+"""
+co_log = np.log(joined_df['CO AQI'])
+co_log_diff = co_log.diff()
+
+plt.figure()
+plt.plot(co_log_diff.diff()[2:])
 plt.show()
 
+wt = WT(co_log_diff.diff()[2:])
+wt.Plot_Rolling_Mean_Var(name='CO AQI log transformed and differenced')
+plt.show()
 
-#%%
-wt = WT(collated_o3_aqi)
-wt.Plot_Rolling_Mean_Var(name='O3 Air Quality Index')
 
 #%% De-Seasonalize the data
 stl = STL(collated_o3_aqi)
