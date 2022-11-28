@@ -139,17 +139,40 @@ def ACF_PACF_Plot(y,lags):
      fig = plt.figure()
      plt.subplot(211)
      plt.title('ACF/PACF of the raw data')
+     # m = 1.96 / np.sqrt(len(y))
      plot_acf(y, ax=plt.gca(), lags=lags)
+     # plt.axhspan(-m, m, alpha=0.2, color='blue')
      plt.subplot(212)
      plot_pacf(y, ax=plt.gca(), lags=lags)
+     # plt.axhspan(-m, m, alpha=0.2, color='blue')
      fig.tight_layout(pad=3)
      plt.show()
 
 ACF_PACF_Plot(data_q3, lags=20)
 
 #%% Q7 and Q8
-data, arma_process = arma_generate_data()
-ArmaProcess
+# Repeat for all examples 2 - 8
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
+arma_data, arma_process, gpac_vals = arma_gpac(7, 7, plot=True)
+ACF_PACF_Plot(arma_data, lags=20)
+
 
 
 
