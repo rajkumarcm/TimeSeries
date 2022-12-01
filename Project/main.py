@@ -404,84 +404,238 @@ wt.Plot_Rolling_Mean_Var(name='O3 Air Quality Index')
 
 #%%
 """--------------------------------------------------------------------------
-Make the dependent variable(s) stationary
+Step 7 - Make the dependent variable(s) stationary
 --------------------------------------------------------------------------"""
-# CO AQI
-# stl = STL(endog=joined_df['CO AQI'], period=12).fit()
-# trend = stl.trend
-# seasonal = stl.seasonal
-# residual = stl.resid
-#
-# de_seasonal = trend * residual
-"""
-RESUME WORK HERE \/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\\/\/\/\/\/\/\
-"""
+
 co_log = np.log(joined_df['CO AQI'])
-co_log_diff = co_log.diff()
+co_log_diff = co_log.diff()[1:]
+co_log_diff = co_log_diff.diff()[2:]
 
 plt.figure()
-plt.plot(co_log_diff.diff()[2:])
+plt.plot(co_log_diff)
+plt.title('CO AQI Log transformed and differenced')
+wt = WT(co_log_diff)
+wt.Plot_Rolling_Mean_Var(name='CO AQI log transformed and 2nd order differenced')
 plt.show()
 
-wt = WT(co_log_diff.diff()[2:])
-wt.Plot_Rolling_Mean_Var(name='CO AQI log transformed and differenced')
-plt.show()
+no2_log = np.log(joined_df['NO2 AQI'])
+no2_log_diff = no2_log.diff()[1:]
 
-
-#%% De-Seasonalize the data
-stl = STL(collated_o3_aqi)
-res = stl.fit()
-T = res.trend
-S = res.seasonal
-R = res.resid
-res.plot()
-Var_R = R.var()
-Var_T = T.var()
-Var_S = S.var()
-strength_of_trend = np.max([0, 1-(Var_R/(T+R).var())])
-strength_of_seasonality = np.max([0, 1-(Var_R/(S+R).var())])
-print(f'Strength of the trend {100 * strength_of_trend:.2f}')
-print(f'Strength of the seasonality {100 * strength_of_seasonality:.2f}')
-
-#%%
-deseasoned_o3_aqi = collated_o3_aqi - S.reset_index().set_axis(axis=1, labels=['Date Local', 'O3 AQI']).set_index('Date Local')
 plt.figure()
-deseasoned_o3_aqi.plot()
+plt.plot(no2_log_diff)
+plt.title('NO2 AQI Log transformed and differenced')
+wt = WT(no2_log_diff)
+wt.Plot_Rolling_Mean_Var(name='NO2 AQI log transformed and differenced')
+plt.show()
+
+stl = STL(joined_df['SO2 AQI'], period=12).fit()
+so2_trend = stl.trend
+so2_seasonal = stl.seasonal
+so2_residual = stl.resid
+sadj_so2 = so2_trend + so2_residual
+stl = STL(sadj_so2, period=12).fit()
+so2_trend = stl.trend
+so2_seasonal = stl.seasonal
+so2_residual = stl.resid
+so2_stationary = so2_seasonal + so2_residual
+
+plt.figure()
+plt.plot(so2_stationary)
+plt.title('SO2 AQI Deseasonalized, and detrended using STL')
+wt = WT(so2_stationary)
+wt.Plot_Rolling_Mean_Var(name='SO2 AQI Deseasonalized, and detrended using STL')
+plt.show()
+
+o3_log = np.log(joined_df['O3 AQI'])
+o3_log_diff = o3_log.diff()[1:]
+
+plt.figure()
+plt.plot(o3_log_diff)
+plt.title('O3 AQI Log transformed and differenced')
+wt = WT(o3_log_diff)
+wt.Plot_Rolling_Mean_Var(name='O3 AQI log transformed and differenced')
 plt.show()
 
 #%%
-deseasoned_o3_aqi = np.log(collated_o3_aqi)
-deseasoned_o3_aqi = deseasoned_o3_aqi.diff()
-
-
-#%%
-wt = WT(deseasoned_o3_aqi['O3 AQI'].iloc[1:])
-fig, axes = plt.subplots(3, 1, figsize=(9, 15))
-deseasoned_o3_aqi.plot(ax=axes[0])
-axes[0].set_ylabel('O3 AQI Value')
-axes[0].set_title('Stationary O3 AQI data')
-
-wt.Plot_Rolling_Mean_Var(name='Stationary O3 AQI', axes=axes, start_idx=1)
-plt.show()
-
-#%%
+"""
+ACF of the dependent variables
+"""
 corr = Corr()
-corr.acf(x=deseasoned_o3_aqi['O3 AQI'].iloc[1:], max_lag=100)
-
-#%% Second order differencing
-deseasoned_o3_aqi_2nd_order = deseasoned_o3_aqi.diff().iloc[2:]
-corr.acf(x=deseasoned_o3_aqi_2nd_order['O3 AQI'].iloc[1:], max_lag=100)
+fig, axes = plt.subplots(4, 1, figsize=(13, 12))
+corr.acf(x=co_log_diff.reset_index(drop=True), max_lag=40, name='CO Log transformed and 2nd order differenced',
+         ax=axes[0])
+corr.acf(x=no2_log_diff.reset_index(drop=True), max_lag=40, name='NO2 Log transformed', ax=axes[1])
+corr.acf(x=so2_log_diff.reset_index(drop=True), max_lag=40, name='SO2 Log transformed', ax=axes[2])
+corr.acf(x=o3_log_diff.reset_index(drop=True), max_lag=40, name='O3 Log transformed', ax=axes[3])
+fig.tight_layout()
+plt.show()
 
 #%%
-fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-weather_df[['Rel_Humdity_Max', 'Rel_Humidity_Min', 'Rel_Humidity_Mean']].plot.box(showfliers=False, ax=axes[0])
-axes[0].set_title('Relative Humidity')
-axes[0].set_ylabel('Rel Humidity Value')
-
-weather_df[['Air_Temp_Max', 'Air_Temp_Min', 'Air_Temp_Mean']].plot.box(showfliers=False, ax=axes[1])
-axes[1].set_title('Air Temperature')
-axes[1].set_ylabel('Degree Centigrade')
+"""
+PACF of the dependent variables
+"""
+from statsmodels.graphics.tsaplots import plot_pacf
+fig, axes = plt.subplots(4, 1, figsize=(13, 12))
+plot_pacf(co_log_diff, ax=axes[0], title='PACF of CO Log transformed and 2nd order differenced')
+plot_pacf(no2_log_diff, ax=axes[1], title='PACF of NO2 Log transformed and differenced')
+plot_pacf(so2_log_diff, ax=axes[2], title='PACF of NO2 Log transformed and differenced')
+plot_pacf(o3_log_diff, ax=axes[3], title='PACF of O3 Log transformed and differenced')
+fig.tight_layout()
 plt.show()
+
+#%%
+"""
+ADF and KPSS test
+"""
+print("CO AQI stationarized data's ADF test")
+co_wt = WT(x=co_log_diff)
+co_wt.ADF_Cal()
+print('As per the ADF test on CO AQI, the signal is stationary since the p-value (0) is less than '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+print("\nCO AQI stationarized data's KPSS test")
+co_wt.kpss_test()
+print('As per the KPSS test on CO AQI, the signal is stationary since the p-value (0.1) is above '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+
+print("\n\nNO2 AQI stationarized data's ADF test")
+no2_wt = WT(x=no2_log_diff)
+no2_wt.ADF_Cal()
+print('As per the ADF test on NO2 AQI, the signal is stationary since the p-value (0) is less than '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+print("\nNO2 AQI stationarized data's KPSS test")
+no2_wt.kpss_test()
+print('As per the KPSS test on NO2 AQI, the signal is stationary since the p-value (0.1) is above '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+
+print("\n\nSO2 AQI stationarized data's ADF test")
+so2_wt = WT(x=so2_stationary)
+so2_wt.ADF_Cal()
+print('As per the ADF test on SO2 AQI, the signal is stationary since the p-value (0) is less than '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+print("\nSO2 AQI stationarized data's KPSS test")
+so2_wt.kpss_test()
+print('As per the KPSS test on SO2 AQI, the signal is stationary since the p-value (0.1) is above '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+
+print("\n\nO3 AQI stationarized data's ADF test")
+o3_wt = WT(x=o3_log_diff)
+o3_wt.ADF_Cal()
+print('As per the ADF test on O3 AQI, the signal is stationary since the p-value (0) is less than '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+print("\nO3 AQI stationarized data's KPSS test")
+o3_wt.kpss_test()
+print('As per the KPSS test on O3 AQI, the signal is stationary since the p-value (0.1) is above '
+      'the significance threshold that is 0.05, for 95% confidence level.')
+
+
+#%%
+"""
+Step 8 - Time Series Decomposition
+"""
+co_stl = STL(endog=co_aqi, period=12).fit()
+co_trend = co_stl.trend
+co_seasonal = co_stl.seasonal
+co_residual = co_stl.resid
+co_stl.plot()
+plt.show()
+
+plt.figure()
+plt.plot(co_trend * co_residual)
+plt.title('Seasonally adjusted CO AQI data')
+plt.show()
+
+wt = WT(x=co_trend * co_residual)
+wt.Plot_Rolling_Mean_Var(name='Seasonally adjusted data (STL)')
+wt.ADF_Cal()
+wt.kpss_test()
+
+
+corr.acf(pd.Series(co_trend*co_residual).diff()[1:], max_lag=40)
+
+no2_stl = STL(endog=no2_aqi, period=12).fit()
+no2_trend = no2_stl.trend
+no2_seasonal = no2_stl.seasonal
+no2_residual = no2_stl.resid
+no2_stl.plot()
+plt.show()
+
+so2_stl = STL(endog=so2_aqi, period=12).fit()
+so2_trend = so2_stl.trend
+so2_seasonal = so2_stl.seasonal
+so2_residual = so2_stl.resid
+so2_stl.plot()
+plt.show()
+
+o3_stl = STL(endog=o3_aqi, period=12).fit()
+o3_trend = o3_stl.trend
+o3_seasonal = o3_stl.seasonal
+o3_residual = o3_stl.resid
+o3_stl.plot()
+plt.show()
+
+#%%
+"""
+Implement Holt-Winters Method
+|\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/|
+"""
+
+#%%
+def naiive_iterpolate(df, vars):
+    df = df.set_index('Date Local')
+    indices = df.index
+    for var in vars:
+        missing_indices = np.where(df.loc[:, var].isna())[0]
+        for m_index in missing_indices:
+            prev_time_index = indices[m_index - 1]
+            time_index = indices[m_index]
+            df.loc[time_index, var] = df.loc[prev_time_index, var]
+    return df
+
+#%%
+"""
+Impute one or very few missing values in feature columns
+"""
+data_types = joined_df.dtypes.reset_index(drop=True)
+float_indices = np.where(data_types == "float64")
+float_vars = joined_df.dtypes.reset_index().iloc[float_indices[0], 0]
+
+joined_df.loc[:, float_vars.values] = naiive_iterpolate(joined_df, float_vars.values).reset_index()
+joined_df = joined_df.set_index('Date Local')
+
+
+#%%
+"""
+Feature Selection - PCA
+"""
+
+"""Remove Year and Station Number from float vars"""
+float_vars = float_vars[float_vars != "Year"]
+float_vars = float_vars[float_vars != "Station_Number"]
+
+from sklearn.decomposition import PCA
+
+pca = PCA()
+feature_cols = np.setdiff1d(float_vars, aqi_vars)
+pca.fit(joined_df[feature_cols], so2_stationary)
+# The following expression on the right side is expected to return values sorted in descending order
+n_components = len(pca.explained_variance_ratio_[pca.explained_variance_ratio_ >= 0.01])
+
+pca = PCA(n_components=n_components)
+X = pca.fit_transform(joined_df[feature_cols], so2_stationary)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
