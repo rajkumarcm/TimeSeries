@@ -3,10 +3,10 @@ np.random.seed(12345)
 from scipy.signal import dlsim
 # from matplotlib import pyplot as plt
 
-na = 2
-nb = 0
-num = [1, 0, 0]
-den = [1, 0.5, 0.2]
+na = 0
+nb = 2
+num = [1, 0.5, -0.4]
+den = [1, 0, 0]
 system = (num, den, 1)
 T = 10000
 mu = 0
@@ -77,12 +77,13 @@ def get_delta_theta(A, g, mu=None, cov=None):
 
     return delta_theta @ g
 
-def second_step(theta, A, g, mu, cov, log_err=False):
+def second_step(params, A, g, mu, cov, log_err=False):
     # Second order "approximation"
     # delta_theta = np.linalg.inv(A + (mu * np.eye(n, n))) @ g
     delta_theta = get_delta_theta(A=A, g=g, mu=mu, cov=cov)
 
     # Update theta now
+    theta = np.copy(params)
     theta += delta_theta.reshape([-1])
 
     ar_coeffs = [1]
@@ -103,7 +104,7 @@ def second_step(theta, A, g, mu, cov, log_err=False):
     return new_loss, delta_theta, theta
 
 
-mu = 1e-4
+mu = 1e-2
 sse_old = None
 sse_new = None
 cov = None
