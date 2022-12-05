@@ -66,14 +66,18 @@ class LM:
         ar_coeffs = [1]
         if self.na > 0:
             ar_coeffs.extend(params[:self.na])
+            if self.na < self.max_order:
+                ar_coeffs = np.r_[ar_coeffs, np.array([0] * (self.max_order - self.na))]
         else:
-            ar_coeffs.extend([0] * self.max_order)
+            ar_coeffs = np.r_[1, np.array([0] * self.max_order)]
 
         ma_coeffs = [1]
         if self.nb > 0:
             ma_coeffs.extend(params[-self.nb:])
+            if self.nb < self.max_order:
+                ma_coeffs = np.r_[ma_coeffs, np.array([0] * (self.max_order - self.nb))]
         else:
-            ma_coeffs.extend([0] * self.max_order)
+            ma_coeffs = np.r_[1, np.array([0] * self.max_order)]
         # print('debug checkpoint. Check ar and ma coefficients for correctness...')
         return ar_coeffs, ma_coeffs
 
@@ -105,16 +109,7 @@ class LM:
         theta = np.copy(params)
         theta += delta_theta.reshape([-1])
 
-        ar_coeffs = [1]
-        ma_coeffs = [1]
-        if self.na > 0:
-            ar_coeffs.extend(theta[:self.na])
-        else:
-            ar_coeffs.extend([0] * self.max_order)
-        if self.nb > 0:
-            ma_coeffs.extend(theta[-self.nb:])
-        else:
-            ma_coeffs.extend([0] * self.max_order)
+        ar_coeffs, ma_coeffs = self.extract_coeffs(theta)
 
         # Log the Loss
         _, new_loss = self.get_sse(ma_coeffs=ma_coeffs, ar_coeffs=ar_coeffs)
@@ -222,6 +217,7 @@ class LM:
                     print_str += f"b{i+1}: {params[self.na + i]} conf_int: {self.conf_int[self.na + i]}\n"
 
                 print(f"Estimated ARMA Coefficients:\n{print_str}")
+                print(f"Estimated variance of error: \n{self.std_error}")
                 print(f"Covariance of the estimated coefficients:\n{self.cov}")
                 # print("debug checkpoint... Check for correctness of coefficients extraction.")
                 self.zero_pole_c()
@@ -232,16 +228,19 @@ class LM:
 if __name__ == "__main__":
     # The program would also work if you do not give any input as parameters.
     # As per rubrics, it will ask the user to input the values.
-    # lm_example1 = LM(T=10000, na=1, nb=0, ar_coeffs=[0.5], ma_coeffs=None)
+    lm_example1 = LM(T=10000, na=1, nb=0, ar_coeffs=[0.5], ma_coeffs=None)
+    lm_example1.fit()
     # lm_example2 = LM(T=10000, na=0, nb=1, ar_coeffs=None, ma_coeffs=[0.5])
     # lm_example3 = LM(T=10000, na=1, nb=1, ar_coeffs=[-0.5], ma_coeffs=[0.25])
     # lm_example4 = LM(T=10000, na=2, nb=0, ar_coeffs=[-0.5, -0.2], ma_coeffs=None)
     # lm_example5 = LM(T=10000, na=2, nb=1, ar_coeffs=[-0.5, -0.2], ma_coeffs=[-0.5])
     # lm_example6 = LM(T=10000, na=1, nb=2, ar_coeffs=[-0.5], ma_coeffs=[0.5, 0.4])
-    lm_example7 = LM(T=10000, na=0, nb=2, ar_coeffs=None, ma_coeffs=[0.5, -0.4])
+    # lm_example7 = LM(T=10000, na=0, nb=2, ar_coeffs=None, ma_coeffs=[0.5, -0.4])
     # Example 8 requires pole cancellation simplification...
     # lm_example8 = LM(T=10000, na=2, nb=2, ar_coeffs=[-0.5,-0.2], ma_coeffs=[0.5, -0.4])
-    lm_example7.fit()
+    # lm_example7.fit()
+
+    # Phase 2
 
 
 
