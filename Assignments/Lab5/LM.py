@@ -2,6 +2,7 @@ import numpy as np
 np.random.seed(12345)
 from scipy.signal import dlsim
 from warnings import warn
+from matplotlib import pyplot as plt
 
 class LM:
     def __init__(self, T=None, na=None, nb=None, ar_coeffs=None, ma_coeffs=None):
@@ -19,7 +20,6 @@ class LM:
              ma_coeffs = []
              for i in range(nb):
                  ma_coeffs.append(float(input(f'Enter b{i+i} coefficient:')))
-
 
         wn = np.random.normal(loc=0, scale=1, size=T)
         max_order = np.max([na, nb])
@@ -144,7 +144,35 @@ class LM:
 
         return return_code, new_theta, mu, sse_new
 
+    def confidence_interval(self):
+        conf_int = []
+        for i in range(self.n):
+            b1 = self.theta_pred[i] - 2 * np.sqrt(self.cov[i, i])
+            b2 = self.theta_pred[i] + 2 * np.sqrt(self.cov[i, i])
+            # lower bound and upper bound
+            lb = np.min([b1, b2])
+            ub = np.max([b1, b2])
+            conf_int.append([lb, ub])
+        return conf_int
+
+    def zero_pole_c(self):
+        if self.na > 0:
+            print(f"Zeros: {np.roots(np.r_[1, self.theta_pred[:self.na]])}")
+        if self.nb > 0:
+            print(f"Poles: {np.roots(np.r_[1, self.theta_pred[-self.nb:]])}")
+        pass
+
+    def plot_opt_progress(self, losses):
+        plt.figure()
+        plt.plot(range(1, len(losses)+1), losses, '-b', label='Loss')
+        plt.title('Optimization progress')
+        plt.xlabel('Epoch/Iteration')
+        plt.ylabel('SSE')
+        plt.tight_layout()
+        plt.show()
+
     def fit(self):
+        sse_list = []
         cov = None
         std_error = None
         ma_coeffs = [1] + [0] * self.max_order
@@ -175,7 +203,8 @@ class LM:
                                                                              self.mu, g)
 
             # Log the error information
-            print(f"Epoch: {epoch} SSE: {sse_new} theta: {new_theta}")
+            sse_list.append(sse_new)
+            print(f"Epoch: {epoch} SSE: {sse_new} MSE: {sse_new/self.T} theta: {new_theta}")
 
             ar_coeffs, ma_coeffs = self.extract_coeffs(new_theta)
             params = np.copy(new_theta)
@@ -183,15 +212,20 @@ class LM:
             if return_code == -1:
                 self.std_error = sse_new / (self.T - self.n)
                 self.cov = self.std_error * np.linalg.inv(A)
+                self.theta_pred = params
+                self.conf_int = self.confidence_interval()
                 print_str = ""
                 for i in range(self.na):
-                    print_str += f"a{i+1}: {params[i]}\n"
+                    print_str += f"a{i+1}: {params[i]} conf_int: {self.conf_int[i]}\n"
 
                 for i in range(self.nb):
-                    print_str += f"b{i+1}: {params[self.na + i]}\n"
+                    print_str += f"b{i+1}: {params[self.na + i]} conf_int: {self.conf_int[self.na + i]}\n"
 
-                print(f"Estimate AR Coefficients:\n{print_str}")
+                print(f"Estimated ARMA Coefficients:\n{print_str}")
+                print(f"Covariance of the estimated coefficients:\n{self.cov}")
                 # print("debug checkpoint... Check for correctness of coefficients extraction.")
+                self.zero_pole_c()
+                self.plot_opt_progress(sse_list)
                 break
 
 
@@ -204,9 +238,10 @@ if __name__ == "__main__":
     # lm_example4 = LM(T=10000, na=2, nb=0, ar_coeffs=[-0.5, -0.2], ma_coeffs=None)
     # lm_example5 = LM(T=10000, na=2, nb=1, ar_coeffs=[-0.5, -0.2], ma_coeffs=[-0.5])
     # lm_example6 = LM(T=10000, na=1, nb=2, ar_coeffs=[-0.5], ma_coeffs=[0.5, 0.4])
-    # lm_example7 = LM(T=10000, na=0, nb=2, ar_coeffs=None, ma_coeffs=[0.5, -0.4])
-    lm_example8 = LM(T=10000, na=2, nb=2, ar_coeffs=[-0.5,-0.2], ma_coeffs=[0.5, -0.4])
-    lm_example8.fit()
+    lm_example7 = LM(T=10000, na=0, nb=2, ar_coeffs=None, ma_coeffs=[0.5, -0.4])
+    # Example 8 requires pole cancellation simplification...
+    # lm_example8 = LM(T=10000, na=2, nb=2, ar_coeffs=[-0.5,-0.2], ma_coeffs=[0.5, -0.4])
+    lm_example7.fit()
 
 
 
