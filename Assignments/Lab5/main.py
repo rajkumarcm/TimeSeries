@@ -1,12 +1,12 @@
 import numpy as np
-# np.random.seed(123)
+np.random.seed(12345)
 from scipy.signal import dlsim
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 
 na = 2
 nb = 0
-num = [1, 0]
-den = [1, 0.5, 0.25]
+num = [1, 0, 0]
+den = [1, 0.5, 0.2]
 system = (num, den, 1)
 T = 10000
 mu = 0
@@ -18,7 +18,7 @@ _, y_true = dlsim(system, e)
 # plt.plot(y_true[:, 0], 'b')
 # plt.show()
 
-epochs = 50
+epochs = 10
 delta = 1e-7
 ma_coeffs = [1, 0, 0]
 ar_coeffs = [1, 0, 0]
@@ -44,17 +44,15 @@ def derivate1(error_original, theta_plus_delta, delta):
     return np.reshape(((error_original - error_delta) / delta), [-1])
 
 def tune_hyperparams(sse_new, sse_old, new_theta, old_theta, delta_theta, A, mu, g):
-    mu_max = 1e+45
+    mu_max = 1e+33
     if sse_new < sse_old:
         if np.linalg.norm(delta_theta) < 1e-4:
             theta = new_theta
-            std_error = sse_new/(T-n)
-            cov = std_error * np.linalg.inv(A)
-            return -1, theta, mu, sse_new, cov # signal to terminate the loop
+            return -1, theta, mu, sse_new # signal to terminate the loop
         else:
             theta = new_theta
             mu = mu/10
-            return 1, theta, mu, sse_new, np.eye(n, n) * mu
+            return 1, theta, mu, sse_new
 
     return_code = -1
     while sse_new >= sse_old:
@@ -66,7 +64,8 @@ def tune_hyperparams(sse_new, sse_old, new_theta, old_theta, delta_theta, A, mu,
         else:
             sse_new, delta_theta, new_theta = second_step(old_theta, A, g, mu, cov=None)
             return_code = 1
-    return return_code, new_theta, mu, sse_new, np.eye(n, n) * mu
+
+    return return_code, new_theta, mu, sse_new
 
 def get_delta_theta(A, g, mu=None, cov=None):
     delta_theta = None
@@ -109,6 +108,7 @@ sse_old = None
 sse_new = None
 cov = None
 max_order = np.max([na, nb])
+std_error = None
 for epoch in range(epochs):
 
     # 1. Construct X Matrix
@@ -127,10 +127,13 @@ for epoch in range(epochs):
     # 3. Construct Jacobian
     g = X.T @ e
 
+    if epoch == 1:
+        print('breakpoint...')
+
     #---Step2---- Update parameters
     sse_new, delta_theta, new_theta = second_step(params, A, g, mu, cov, log_err=False)
 
-    return_code, new_theta, mu, sse_new, cov = tune_hyperparams(sse_new, sse_old, new_theta, params, delta_theta, A, mu, g)
+    return_code, new_theta, mu, sse_new = tune_hyperparams(sse_new, sse_old, new_theta, params, delta_theta, A, mu, g)
     print(f"Epoch: {epoch} SSE: {sse_new} theta: {new_theta}")
 
     params = new_theta
@@ -145,8 +148,10 @@ for epoch in range(epochs):
     else:
         ma_coeffs.extend([0]*max_order)
 
-    # if return_code == -1:
-    #     break
+    if return_code == -1:
+        std_error = sse_new/(T-n)
+        cov = std_error * np.linalg.inv(A)
+        break
 
 
 
