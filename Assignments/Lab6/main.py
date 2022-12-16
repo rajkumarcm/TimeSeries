@@ -32,6 +32,7 @@ km.fit(durations, event_observed, label='Customer Retention')
 
 #%% Q8. - Plot
 km.plot()
+plt.title('Rate of customer retention over the months')
 plt.show()
 
 #%% Q9 - in the report
@@ -51,7 +52,7 @@ kmf.fit(durations[ix2], event_observed[ix2], label='Two year')
 kmf.plot()
 kmf.fit(durations[ix3], event_observed[ix3], label='One year')
 kmf.plot()
-plt.title('Probability of retaining customers with different tenure')
+plt.title('Rate of customer retention based on different tenure')
 plt.tight_layout()
 plt.show()
 
@@ -71,7 +72,7 @@ kmf1.plot()
 kmf1.fit(durations[streaming_no_bindices], event_observed[streaming_no_bindices],
          label='Does not have StreamingTV')
 kmf1.plot()
-plt.title('Probability of retaining customers with StreamingTV timeline')
+plt.title('Rate of customer retention based on StreamingTV subscription')
 plt.legend()
 plt.tight_layout()
 plt.show()
