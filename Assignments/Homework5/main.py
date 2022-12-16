@@ -1,3 +1,5 @@
+#%%
+
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import dlsim
@@ -8,8 +10,9 @@ from Utilities.Correlation import Correlation as Corr
 from Utilities.GPAC import gpac_table
 import pandas as pd
 import seaborn as sns
-np.random.seed(12345)
+# np.random.seed(12345)
 
+#%%
 def ACF_PACF_Plot(y,lags):
     acf = sm.tsa.stattools.acf(y, nlags=lags)
     pacf = sm.tsa.stattools.pacf(y, nlags=lags)
@@ -28,6 +31,28 @@ def seasonal_differencing(y, seasonal_period):
     for t in range(m, len(y)):
         s_diff.append(y[t] - y[t-m])
     return s_diff
+
+#%%
+def one_step_pred_ex2(y, t):
+    return (0.5 * y[t-2]) - (0.6 * y[t-5])
+
+def h_step_pred_ex2(h, y, yhat, T, t):
+    lag_3 = t+h-3
+    lag_6 = t+h-6
+
+    if lag_3 > T:
+        lag3_val = yhat[lag_3]
+    else:
+        lag3_val = y[t+h-3]
+
+    if lag_6 > T:
+        lag6_val = yhat[lag_6]
+    else:
+        lag6_val = y[t+h-6]
+
+    return (0.5 * lag3_val) - (0.6 * lag6_val)
+
+#%%
 
 def sarima():
     # Q1.
@@ -77,18 +102,8 @@ def sarima():
     else:
         ma_seasonal_period = 0
 
-    if np.sum(tmp_ar_coeffs) == -1:
-        # Differencing coefficient is provided
-        tmp_index = np.where(tmp_ar_coeffs == -1)[0]
-        tmp_ar_coeffs[tmp_index] = 0
-
-    if np.sum(tmp_ma_coeffs) == -1:
-        # Differencing coefficient is provided
-        tmp_index = np.where(tmp_ma_coeffs == -1)[0]
-        tmp_ma_coeffs[tmp_index] = 0
 
     seasonal_period = np.max([ar_seasonal_period, ma_seasonal_period])
-    print('debug...')
 
     max_order = np.max([na, nb, seasonal_period])
 
@@ -137,6 +152,8 @@ def sarima():
         wt.ADF_Cal()
         wt.Plot_Rolling_Mean_Var(name='Differenced dataset')
 
+    seasonal_period = np.max([seasonal_period, count])
+
     # Q8. GPAC
     corr = Corr()
     if raw_pval < 0.01:
@@ -168,16 +185,75 @@ def sarima():
     plt.tight_layout()
     plt.legend()
     plt.show()
-    print('stop me here...')
+    # print('stop me here...')
 
     # Q10 - will be on report
 
 
 sarima()
 
+#%% Questions 12 - 14
+ar_coeffs = [1, 0, 0, -0.5, 0, 0, 0.6]
+ma_coeffs = [1, 0, 0, 0, 0, 0, 0]
+system = (ma_coeffs, ar_coeffs, 1)
+T = 10000
+wn = np.random.normal(loc=0, scale=1, size=T)
+_, y_out = dlsim(system, wn)
+y_out = y_out[:, 0]
+
+#%%
+y_hat = []
+for t in range(5, 105):
+    y_hat.append(one_step_pred_ex2(y_out, t))
+
+#%%
+plt.plot(y_out[6:106], '-b', label='Raw data')
+plt.plot(y_hat, color='orange', label='1-step prediction')
+plt.xlabel('Time (t)')
+plt.ylabel('Value')
+plt.title('$ARIMA(2,0,0)_{3}$')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+#%%
+residual = y_out[6:106] - y_hat
+corr = Corr()
+acf_residual, _ = corr.acf(x=residual, max_lag=20, plot=True, return_acf=True)
+
+#%%
+
+import statsmodels.api as sm
+Q = T * (acf_residual[1:].T @ acf_residual[1:])
+alpha = 0.01
+DOF = 20 - 6
+lbvalue, pvalue = sm.stats.acorr_ljungbox(residual, lags=[20])
 
 
 
+#%%
+
+y_hat_new = [0]*5
+for t in range(5, 1001):
+    y_hat_new.append(one_step_pred_ex2(y_out, t))
+
+#%% Question 15
+y_hat_50 = []
+for t in range(901, 951):
+    y_hat_50.append(h_step_pred_ex2(h=50, y=y_out, yhat=y_hat_new, t=t, T=950))
+
+#%%
+plt.plot(y_out[952:1002], '-b', label='Raw data')
+plt.plot(y_hat_50, color='orange', label='50-step prediction')
+plt.xlabel('Time (t)')
+plt.ylabel('Value')
+plt.title('$ARIMA(2,0,0)_{3}$')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+#%%
+print(f"Variance of test set vs predicted {np.var(y_out[952:1002])/np.var(y_hat_50)}")
 
 
 
