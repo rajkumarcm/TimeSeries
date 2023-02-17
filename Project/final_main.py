@@ -488,6 +488,11 @@ print(sm.stats.acorr_ljungbox(x=residuals, lags=[50]))
 """
 Plot that shows the fit between the original data and the predicted data
 """
+co_log_mean = np.mean(co_log)
+co_log_total = (co_log - co_log_mean).T @ (co_log - co_log_mean)
+arima_res_ss = (co_log - y_hat).T @ (co_log - y_hat)
+arima_r2 = 1 - (arima_res_ss/co_log_total)
+
 y_hat_exp = np.exp(y_hat)
 
 fig, axes = plt.subplots(2, 1, figsize=(15, 15))
@@ -523,8 +528,8 @@ plt.show()
 ARIMA(4,1,3) - MANUAL H-STEP PREDICTION - FORECAST FUNCTION WITH BACK TRANSFORMATION
 """
 
-joined_df = pd.read_csv('joined_df.csv', header=0, index_col='Date Local')
-co_x = joined_df['CO AQI'].reset_index(drop=True)
+# joined_df = pd.read_csv('joined_df.csv', header=0, index_col='Date Local')
+co_x = joined_df['CO AQI'][:train_test_split+50].reset_index(drop=True)
 co_train_arima = np.log(co_x[:-50]).diff()
 co_test_arima = np.log(co_x[-50:]).diff()
 e = co_train_arima.diff()
@@ -617,7 +622,7 @@ plt.show()
 
 plt.figure()
 plt.plot(co_test_arima, label='test set')
-plt.plot(last_50_hstep[-50:], label='h-step')
+plt.plot(last_50_hstep, label='h-step')
 plt.legend()
 plt.title('ARIMA(4,1,3) h-step prediction')
 plt.grid(True)
@@ -661,6 +666,11 @@ ets = ETS(endog=co, seasonal='mul', seasonal_periods=seasonal_period,
 
 ets_yhat = ets.predict(start=0, end=co.shape[0]-1)
 
+co_mean = np.mean(co)
+co_tot_ss = (co - co_mean).T @ (co - co_mean)
+holt_res_ss = (co - ets_yhat).T @ (co - ets_yhat)
+holt_r2 = 1 - (holt_res_ss/co_tot_ss)
+
 # Plotting y vs the yhat to illustrate the goodness of fit of the model to the data
 plt.figure()
 plt.plot(co.head(100), label='training data')
@@ -672,6 +682,23 @@ plt.xticks(rotation=90)
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+ets_forecast = ets.forecast(steps=co_test.shape[0])
+plt.figure()
+plt.plot(co, label='training data')
+plt.plot(ets_yhat, label='predicted')
+plt.plot(co_test, label='test data')
+plt.plot(co_test.index.values, ets_forecast.reset_index(drop=True), label='forecast data')
+plt.title('Holts Winter Seasonal Method')
+plt.xlabel('Date')
+plt.ylabel('CO AQI')
+plt.xticks(rotation=90)
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+tmp_diff = co_test.reset_index(drop=True).values - ets_forecast.reset_index(drop=True).values
+ets_forecast_rmse = np.sqrt(np.mean(tmp_diff.T @ tmp_diff))
 
 #%% Replace missing values in the exogenous variables using naive method
 
@@ -784,6 +811,9 @@ ols2_train_pred = ols_fit2.predict(exog=X_train_z)
 ols2_test_pred = ols_fit2.predict(exog=X_test_z)
 diff2 = y_test - np.exp(ols2_test_pred)
 ols2_mse = (1/diff2.shape[0]) * (diff2.T @ diff2)
+ols2_tot_ss = (y_test - np.mean(y_test)).T @ (y_test - np.mean(y_test))
+ols2_res_ss = diff2.T @ diff2
+ols2_r2 = 1 - (ols2_res_ss/ols2_tot_ss)
 
 spaced_xlabels = []
 for i, index_val in zip(range(X_train.shape[0]), X_train.index.values):
@@ -854,6 +884,10 @@ ols1_test_pred = ols_fit.predict(exog=X_test_w)
 diff1 = y_test - np.exp(ols1_test_pred)
 ols1_mse = (1/diff1.shape[0]) * (diff1.T @ diff1)
 
+ols1_tot_ss = (y_test - np.mean(y_test)).T @ (y_test - np.mean(y_test))
+ols1_res_ss = diff1.T @ diff1
+ols1_r2 = 1 - (ols1_res_ss/ols1_tot_ss)
+
 # PCA - dimensionality reduction
 vals = vals[indices_desc]
 vecs = vecs[:, indices_desc]
@@ -877,9 +911,18 @@ ols3_fit = sm.regression.linear_model.OLS(endog=np.log(y_train), exog=X_train_l)
 print("OLS Model on Latent space")
 print(ols3_fit.summary())
 
+
 # Making prediction using the model fitted on data that is reduced in dimension
 ols3_train_pred = ols3_fit.predict(exog=X_train_l)
 ols3_test_pred = ols3_fit.predict(exog=X_test_l)
+
+diff3 = y_test - np.exp(ols3_test_pred)
+ols3_mse = (1/diff3.shape[0]) * (diff3.T @ diff3)
+
+ols3_tot_ss = (y_test - np.mean(y_test)).T @ (y_test - np.mean(y_test))
+ols3_res_ss = diff3.T @ diff3
+ols3_r2 = 1 - (ols1_res_ss/ols3_tot_ss)
+
 
 # Plot the quality of fit
 plt.figure()
@@ -893,8 +936,7 @@ plt.ylabel('CO AQI')
 plt.title('OLS Model on PCA data')
 plt.show()
 
-diff3 = y_test - np.exp(ols3_test_pred)
-ols3_mse = (1/diff3.shape[0]) * (diff3.T @ diff3)
+
 
 print("Performance on test set")
 print(f"RMSE of OLS - Whitened data is {ols1_mse**.5}")
@@ -916,6 +958,13 @@ co_avg_pred_forecast = avg_forecast(x=joined_df['CO AQI'], T=train_size,
                                     one=True, h=True, h_length=test_size,
                                     plot=True)
 plt.show()
+
+tmp_y = joined_df['CO AQI'].reset_index(drop=True)[train_size:train_size+test_size]
+tmp_y_mean = np.mean(tmp_y)
+co_avg_tot_ss = (tmp_y - tmp_y_mean).T @ (tmp_y - tmp_y_mean)
+co_avg_res_ss = (tmp_y - co_avg_pred_forecast[1]).T @ (tmp_y - co_avg_pred_forecast[1])
+avg_r2 = 1 - (co_avg_res_ss/co_avg_tot_ss)
+
 indices = joined_df.index.values
 
 train_indices = indices[:train_size]
@@ -926,6 +975,13 @@ test_indices = indices[train_size:]
 
 co_naive_pred_forecast = naive_method(x=joined_df['CO AQI'], T=train_size,
                                     one=True, h=True, h_length=test_size)
+
+tmp_y = joined_df['CO AQI'].reset_index(drop=True)[train_size:train_size+test_size]
+tmp_y_mean = np.mean(tmp_y)
+co_naive_tot_ss = (tmp_y - tmp_y_mean).T @ (tmp_y - tmp_y_mean)
+co_naive_res_ss = (tmp_y - co_naive_pred_forecast[1]).T @ (tmp_y - co_naive_pred_forecast[1])
+naive_r2 = 1 - (co_naive_res_ss/co_naive_tot_ss)
+
 indices = joined_df.index
 plt.figure()
 plt.plot(joined_df.iloc[1:train_size]['CO AQI'].reset_index(drop=True), '-b', label='Training')
@@ -942,8 +998,17 @@ co_drift_pred_forecast = drift_forecast(x=joined_df['CO AQI'], T=train_size,
                                         one=True, h=True, h_length=test_size,
                                         plot=True)
 
+tmp_y = joined_df['CO AQI'].reset_index(drop=True)[train_size:train_size+test_size]
+tmp_y_mean = np.mean(tmp_y)
+co_drift_tot_ss = (tmp_y - tmp_y_mean).T @ (tmp_y - tmp_y_mean)
+co_drift_res_ss = (tmp_y - co_drift_pred_forecast[1]).T @ (tmp_y - co_drift_pred_forecast[1])
+drift_r2 = 1 - (co_drift_res_ss/co_drift_tot_ss)
+
 #%%
 co_ses_pred_forecast = ses(x=joined_df['CO AQI'], T=train_size, h_length=test_size)
+co_ses_tot_ss = (tmp_y - tmp_y_mean).T @ (tmp_y - tmp_y_mean)
+co_ses_res_ss = (tmp_y - co_ses_pred_forecast[1]).T @ (tmp_y - co_ses_pred_forecast[1])
+ses_r2 = 1 - (co_ses_res_ss/co_ses_tot_ss)
 
 plt.figure()
 plt.plot(co.reset_index(drop=True), label='Training data')

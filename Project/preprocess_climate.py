@@ -30,7 +30,3 @@ for i in range(2000, 2016+1):
         main_df = tmp
     else:
         main_df = pd.concat([main_df, tmp], axis=0)
-
-
-
-print('debug...')

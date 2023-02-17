@@ -5,12 +5,41 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from os import chdir
 from os.path import abspath, join
+import statsmodels.api as sm
 from statsmodels.tsa import holtwinters as ETS
 from Utilities.WhitenessTest import WhitenessTest as WT
 from Utilities.Correlation import Correlation as Corr
 from statsmodels.tsa.seasonal import STL
 import seaborn as sns
 from numpy.testing import assert_equal
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from Utilities.GPAC import gpac_table
+from scipy.stats import chi2
+
+#%% \/\/\/\/ NEED TO FIX THIS-----------------------------------------
+def whiteness_test(x, name):
+    wt = WT(x)
+    print(f"ADF test for {name}:\n")
+    wt.ADF_Cal()
+    wt.Plot_Rolling_Mean_Var(name=name)
+
+#%%
+def plot_acf_pacf(x, lags, xlims=None):
+    r_idx = 0
+    if xlims:
+        fig, axes = plt.subplots(len(xlims), 2, sharex=False, sharey=True, figsize=(15, 10))
+        for xlim in xlims:
+            plot_acf(x, lags=lags, ax=axes[r_idx, 0])
+            plot_pacf(x, lags=lags, ax=axes[r_idx, 1])
+            axes[r_idx, 0].set_xlim(xlim)
+            axes[r_idx, 1].set_xlim(xlim)
+            r_idx += 1
+    else:
+        fig, axes = plt.subplots(2, 1, sharex=True, figsize=(11, 5))
+        plot_acf(x, lags=lags, ax=axes[0])
+        plot_pacf(x, lags=lags, ax=axes[1])
+    plt.tight_layout()
+    plt.show()
 
 #%% Load the data
 uspoll = pd.read_csv('pollution_us_2000_2016.csv', header=0, index_col=0)
@@ -183,213 +212,7 @@ uspoll_state = uspoll_state.set_index('Date Local')
 uspoll_state.loc[:, aqi_vars] = seasonal_naive_forecast(df=uspoll_state, vars=aqi_vars, m=375)
 # print('debug...')
 
-#%%
-#
-# """ --- FOR CO AQI
-# Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the
-# seasonality period that yields the minimal MSE value.
-# """
-#
-# mse_list_co = [np.Inf, np.Inf]
-# n = co_aqi.shape[0]
-# train_ratio = 0.7
-# train_len = int(train_ratio * n)
-# co_train, co_test = subset_nmissing['CO AQI'].iloc[:train_len], \
-#                     subset_nmissing['CO AQI'].iloc[train_len:]
-#
-# for i in range(2, 400):
-#     ets_co = ETS.ExponentialSmoothing(co_train, trend=None, damped_trend=False,
-#                                       seasonal="mul", seasonal_periods=i).fit()
-#     # y_true = co_train.reset_index(drop=True).values.reshape([-1])
-#     # y_pred = ets_co.fittedvalues.reset_index(drop=True).values.reshape([-1])
-#     y_true = co_test.reset_index(drop=True).values.reshape([-1])
-#     y_pred = ets_co.forecast(steps=co_test.shape[0])
-#     diff = y_true - y_pred
-#     mse = 1/len(diff) * (diff.T @ diff)
-#     mse_list_co.append(mse)
-#
-# #%%
-# """ --- FOR CO AQI
-# Using the seasonality period that produced the minimal MSE value, fit the data to the model as
-# we did not retain the best model from the previous step.
-# """
-# seasonality_period = np.argmin(mse_list_co) + 1  # + 1 due to indices starting from 0
-#
-# ets_co = ETS.ExponentialSmoothing(subset_nmissing['CO AQI'], trend=None, damped_trend=False,
-#                                   seasonal="mul", seasonal_periods=seasonality_period).fit()
-# """
-# Use forecast method to extrapolate CO AQI to period the values were not registered.
-# """
-# co_imputed_data = ets_co.forecast(steps=missing_dates.shape[0])
-#
-# plt.figure()
-# plt.plot(subset_nmissing['CO AQI'].reset_index(drop=True), '-b')
-# plt.plot(ets_co.fittedvalues.reset_index(drop=True), '-r', alpha=0.8)
-# plt.ylabel('CO AQI')
-# plt.title('Carbon Monoxide Air Quality Index after Imputation')
-# plt.show()
-#
-# #%%
-# """
-# Now add the imputed values back to the CO AQI data frame
-# """
-# uspoll_state = uspoll_state.set_index('Date Local').asfreq('D')
-# missing_idx_start = missing_dates.reset_index()['Date Local'].min()
-# missing_idx_end = missing_dates.reset_index()['Date Local'].max()
-# # reset_index()[0] should return CO AQI col
-# uspoll_state.loc[missing_idx_start:missing_idx_end, 'CO AQI'] = co_imputed_data.reset_index()[0].values
-# uspoll_state.loc[missing_idx_start:missing_idx_end, 'State'] = 'Arizona'
-#
-# #%%
-# # stl = STL(o3_aqi, period=13)
-# # res = stl.fit()
-# # R = res.resid
-# # T = res.trend
-# # S = res.seasonal
-# # strength_of_trend = np.max([0, (1-(R.var()/(T+R).var()))])
-# # strength_of_seasonality = np.max([0, (1-(R.var()/(S+R).var()))])
-# # print(f'Strength of the trend {100 * strength_of_trend:.2f}')
-# # print(f'Strength of the seasonality {100 * strength_of_seasonality:.2f}')
-#
-#
-# #%% Impute the O3 AQI
-# """ --- FOR O3 AQI
-# Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the
-# seasonality period that yields the minimal MSE value.
-# """
-#
-# mse_list_o3_aqi = [np.Inf, np.Inf]
-# # I believe using the test data to check for minimum MSE is not required at this stage
-# # as we are imputing just 5 values.
-# # o3_train, o3_test = o3_aqi.iloc[:train_len], \
-# #                     o3_aqi.iloc[train_len:]
-# for i in range(2, 400):
-#     ets_o3 = ETS.ExponentialSmoothing(o3_aqi, trend=None, damped_trend=False,
-#                                       seasonal="additive", seasonal_periods=i).fit()
-#     y_true = o3_aqi.reset_index(drop=True).values.reshape([-1])
-#     y_pred = ets_o3.fittedvalues.reset_index(drop=True).values.reshape([-1])
-#     diff = y_true - y_pred
-#     mse = 1/len(diff) * (diff.T @ diff)
-#     mse_list_o3_aqi.append(mse)
-#
-#
-# #%% O3 Holts Winter Seasonal Fit
-# """ --- FOR O3 AQI
-# Using the seasonality period that produced the minimal MSE value, fit the data to the model as
-# we did not retain the best model from the previous step.
-# """
-# seasonality_period_o3_aqi = np.argmin(mse_list_o3_aqi) + 1 # + 1 due to indices starting from 0
-#
-# ets_o3_aqi = ETS.ExponentialSmoothing(o3_aqi, trend=None, damped_trend=False,
-#                seasonal="additive", seasonal_periods=seasonality_period_o3_aqi).fit()
-# """
-# Use forecast method to extrapolate O3 AQI to period the values were not registered.
-# """
-# imputed_data_o3_aqi = ets_o3_aqi.forecast(steps=missing_dates.shape[0])
-#
-# plt.figure()
-# plt.plot(o3_aqi, '-b')
-# plt.plot(ets_o3_aqi.fittedvalues, '-r')
-# plt.title('O3 Air Quality Index')
-# plt.ylabel('Air Quality Index')
-# plt.show()
-#
-# #%% O3 AQI Holt Winter Seasonal Imputation
-# """
-# Now add the imputed values back to the O3 AQI data frame
-# """
-# uspoll_state.loc[missing_idx_start:missing_idx_end, 'O3 AQI'] = imputed_data_o3_aqi.reset_index()[0].values
-#
-# #%% Impute the NO2 AQI
-# """ --- FOR NO2 AQI
-# Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the
-# seasonality period that yields the minimal MSE value.
-# """
-#
-# mse_list_no2_aqi = [np.Inf, np.Inf]
-#
-# for i in range(2, 400):
-#     ets_no2 = ETS.ExponentialSmoothing(no2_aqi, trend=None, damped_trend=False,
-#                                       seasonal="additive", seasonal_periods=i).fit()
-#     y_true = no2_aqi.reset_index(drop=True).values.reshape([-1])
-#     y_pred = ets_no2.fittedvalues.reset_index(drop=True).values.reshape([-1])
-#     diff = y_true - y_pred
-#     mse = 1/len(diff) * (diff.T @ diff)
-#     mse_list_no2_aqi.append(mse)
-#
-#
-# #%% NO2 Holts Winter Seasonal Fit
-# """ --- FOR NO2 AQI
-# Using the seasonality period that produced the minimal MSE value, fit the data to the model as
-# we did not retain the best model from the previous step.
-# """
-# seasonality_period_no2_aqi = np.argmin(mse_list_no2_aqi) + 1 # + 1 due to indices starting from 0
-#
-# ets_no2_aqi = ETS.ExponentialSmoothing(no2_aqi, trend=None, damped_trend=False,
-#                seasonal="additive", seasonal_periods=seasonality_period_no2_aqi).fit()
-# """
-# Use forecast method to extrapolate NO2 AQI to period the values were not registered.
-# """
-# imputed_data_no2_aqi = ets_no2_aqi.forecast(steps=missing_dates.shape[0])
-#
-# plt.figure()
-# plt.plot(no2_aqi, '-b')
-# plt.plot(ets_no2_aqi.fittedvalues, '-r')
-# plt.title('NO2 Air Quality Index')
-# plt.ylabel('Air Quality Index')
-# plt.show()
-#
-# #%% NO2 AQI Holt Winter Seasonal Imputation
-# """
-# Now add the imputed values back to the NO2 AQI data frame
-# """
-# uspoll_state.loc[missing_idx_start:missing_idx_end, 'NO2 AQI'] = imputed_data_no2_aqi.reset_index()[0].values
-#
-# #%% Impute the SO2 AQI
-# """ --- FOR SO2 AQI
-# Iterate over different seasonality period and try fitting Holts Winter Seasonal method. Pick the
-# seasonality period that yields the minimal MSE value.
-# """
-#
-# mse_list_so2_aqi = [np.Inf, np.Inf]
-#
-# for i in range(2, 400):
-#     ets_so2 = ETS.ExponentialSmoothing(so2_aqi, trend=None, damped_trend=False,
-#                                       seasonal="additive", seasonal_periods=i).fit()
-#     y_true = so2_aqi.reset_index(drop=True).values.reshape([-1])
-#     y_pred = ets_so2.fittedvalues.reset_index(drop=True).values.reshape([-1])
-#     diff = y_true - y_pred
-#     mse = 1/len(diff) * (diff.T @ diff)
-#     mse_list_so2_aqi.append(mse)
-#
-#
-# #%% SO2 Holts Winter Seasonal Fit
-# """ --- FOR SO2 AQI
-# Using the seasonality period that produced the minimal MSE value, fit the data to the model as
-# we did not retain the best model from the previous step.
-# """
-# seasonality_period_so2_aqi = np.argmin(mse_list_so2_aqi) + 1 # + 1 due to indices starting from 0
-#
-# ets_so2_aqi = ETS.ExponentialSmoothing(so2_aqi, trend=None, damped_trend=False,
-#                seasonal="additive", seasonal_periods=seasonality_period_so2_aqi).fit()
-# """
-# Use forecast method to extrapolate SO2 AQI to period the values were not registered.
-# """
-# imputed_data_so2_aqi = ets_so2_aqi.forecast(steps=missing_dates.shape[0])
-#
-# plt.figure()
-# plt.plot(so2_aqi, '-b')
-# plt.plot(ets_so2_aqi.fittedvalues, '-r')
-# plt.title('SO2 Air Quality Index')
-# plt.ylabel('Air Quality Index')
-# plt.show()
-#
-# #%% SO2 AQI Holt Winter Seasonal Imputation
-# """
-# Now add the imputed values back to the SO2 AQI data frame
-# """
-# uspoll_state.loc[missing_idx_start:missing_idx_end, 'SO2 AQI'] = imputed_data_so2_aqi.reset_index()[0].values
-
+# HWS removed and stored in backup.txt
 #%%
 """
 Weather Dataset is now included to aid in the process of regression.
@@ -414,8 +237,26 @@ plt.title('Correlation Plot', fontsize=20)
 fig.tight_layout()
 plt.show()
 
+#%% ADF-test of raw data
+wt_raw_no = WT(x=joined_df['NO2 AQI'])
+print("ADF of raw NO2 AQI data\n")
+wt_raw_no.ADF_Cal()
 
-#%%
+wt_raw_co = WT(x=joined_df['CO AQI'])
+print("\nADF of raw CO AQI data\n")
+wt_raw_co.ADF_Cal()
+
+wt_raw_so = WT(x=joined_df['SO2 AQI'])
+print("\nADF of raw SO2 AQI data\n")
+wt_raw_so.ADF_Cal()
+
+wt_raw_o3 = WT(x=joined_df['O3 AQI'])
+print("\nADF of raw O3 AQI data\n")
+wt_raw_o3.ADF_Cal()
+
+
+#%% Rolling mean and the variance of raw dataset
+
 wt = WT(joined_df['NO2 AQI'])
 wt.Plot_Rolling_Mean_Var(name='NO2 Air Quality Index')
 
@@ -430,84 +271,107 @@ wt.Plot_Rolling_Mean_Var(name='O3 Air Quality Index')
 
 #%%
 """--------------------------------------------------------------------------
-Step 7 - Make the dependent variable(s) stationary
+Step 7 - Print the strength of seasonality and trend
 --------------------------------------------------------------------------"""
 
-co_log = np.log(joined_df['CO AQI'])
-co_log_diff = co_log.diff()[1:]
-co_log_diff = co_log_diff.diff()[2:]
+def print_strength_seas_tren(x, name):
+    stl = STL(x, period=12).fit()
+    residual = stl.resid
+    trend = stl.trend
+    seasonal = stl.seasonal
+    f_t = np.max([0, 1-(np.var(residual)/np.var(residual + trend))]) # denominator = seasonally adjusted data
+    f_s = np.max([0, 1-(np.var(residual)/np.var(residual + seasonal))]) # denominator = detrended data
+    print(f"Strength of trend in {name} is: {f_t * 100}%")
+    print(f"Strength of seasonality in {name} is {f_s * 100}%")
 
-plt.figure()
-plt.plot(co_log_diff)
-plt.title('CO AQI Log transformed and differenced')
-wt = WT(co_log_diff)
-wt.Plot_Rolling_Mean_Var(name='CO AQI log transformed and 2nd order differenced')
-plt.show()
+print_strength_seas_tren(joined_df['CO AQI'], 'CO AQI')
+print("")
+print_strength_seas_tren(joined_df['SO2 AQI'], 'SO2 AQI')
+print("")
+print_strength_seas_tren(joined_df['NO2 AQI'], 'NO2 AQI')
+print("")
+print_strength_seas_tren(joined_df['O3 AQI'], 'O3 AQI')
 
-no2_log = np.log(joined_df['NO2 AQI'])
-no2_log_diff = no2_log.diff()[1:]
-
-plt.figure()
-plt.plot(no2_log_diff)
-plt.title('NO2 AQI Log transformed and differenced')
-wt = WT(no2_log_diff)
-wt.Plot_Rolling_Mean_Var(name='NO2 AQI log transformed and differenced')
-plt.show()
-
-stl = STL(joined_df['SO2 AQI'], period=12).fit()
-so2_trend = stl.trend
-so2_seasonal = stl.seasonal
-so2_residual = stl.resid
-sadj_so2 = so2_trend + so2_residual
-stl = STL(sadj_so2, period=12).fit()
-so2_trend = stl.trend
-so2_seasonal = stl.seasonal
-so2_residual = stl.resid
-so2_stationary = so2_seasonal + so2_residual
-
-plt.figure()
-plt.plot(so2_stationary)
-plt.title('SO2 AQI Deseasonalized, and detrended using STL')
-wt = WT(so2_stationary)
-wt.Plot_Rolling_Mean_Var(name='SO2 AQI Deseasonalized, and detrended using STL')
-plt.show()
-
-o3_log = np.log(joined_df['O3 AQI'])
-o3_log_diff = o3_log.diff()[1:]
-
-plt.figure()
-plt.plot(o3_log_diff)
-plt.title('O3 AQI Log transformed and differenced')
-wt = WT(o3_log_diff)
-wt.Plot_Rolling_Mean_Var(name='O3 AQI log transformed and differenced')
-plt.show()
 
 #%%
 """
 ACF of the dependent variables
 """
 corr = Corr()
-fig, axes = plt.subplots(4, 1, figsize=(13, 12))
-corr.acf(x=co_log_diff.reset_index(drop=True), max_lag=40, name='CO Log transformed and 2nd order differenced',
-         ax=axes[0])
-corr.acf(x=no2_log_diff.reset_index(drop=True), max_lag=40, name='NO2 Log transformed', ax=axes[1])
-corr.acf(x=so2_stationary.reset_index(drop=True), max_lag=40, name='SO2 Log transformed', ax=axes[2])
-corr.acf(x=o3_log_diff.reset_index(drop=True), max_lag=40, name='O3 Log transformed', ax=axes[3])
+fig, axes = plt.subplots(2, 4, figsize=(20, 5))
+
+plot_acf(joined_df['CO AQI'], ax=axes[0, 0])
+plot_pacf(joined_df['CO AQI'], ax=axes[1, 0])
+axes[0,0].set_title('CO AQI ACF')
+axes[1,0].set_title('CO AQI PACF')
+
+plot_acf(joined_df['NO2 AQI'], ax=axes[0, 1])
+plot_pacf(joined_df['NO2 AQI'], ax=axes[1, 1])
+axes[0,1].set_title('NO2 AQI ACF')
+axes[1,1].set_title('NO2 AQI PACF')
+
+plot_acf(joined_df['SO2 AQI'], ax=axes[0, 2])
+plot_pacf(joined_df['SO2 AQI'], ax=axes[1, 2])
+axes[0,2].set_title('SO2 AQI ACF')
+axes[1,2].set_title('SO2 AQI PACF')
+
+plot_acf(joined_df['O3 AQI'], ax=axes[0, 3])
+plot_pacf(joined_df['O3 AQI'], ax=axes[1, 3])
+axes[0,3].set_title('O3 AQI ACF')
+axes[1,3].set_title('O3 AQI PACF')
+
 fig.tight_layout()
 plt.show()
 
 #%%
 """
-PACF of the dependent variables
+Having seen the ACF, and the PACF of the CO AQI, it appears the data was generated by an 
+AutoRegressive process since the PACF exhibits cut-off pattern while the ACF exhibits tail-off.
 """
-from statsmodels.graphics.tsaplots import plot_pacf
-fig, axes = plt.subplots(4, 1, figsize=(13, 12))
-plot_pacf(co_log_diff, ax=axes[0], title='PACF of CO Log transformed and 2nd order differenced')
-plot_pacf(no2_log_diff, ax=axes[1], title='PACF of NO2 Log transformed and differenced')
-plot_pacf(so2_stationary, ax=axes[2], title='PACF of NO2 Log transformed and differenced')
-plot_pacf(o3_log_diff, ax=axes[3], title='PACF of O3 Log transformed and differenced')
-fig.tight_layout()
+def seasonal_differencing(y, seasonal_period):
+    m = seasonal_period
+    s_diff = []
+    for t in range(m, len(y)):
+        s_diff.append(y[t] - y[t-m])
+    return s_diff
+
+co_diff1 = joined_df['CO AQI'].diff()[1:]
+fig, axes = plt.subplots(2, 1)
+plot_acf(co_diff1, lags=100, )
+plot_pacf(co_diff1, lags=100)
 plt.show()
+
+"""
+After applying first order differencing, the ACF, and the PACF now shows signs of an MA process. 
+Perhaps this is a multiplicative model that generated the data.
+"""
+print_strength_seas_tren(co_diff1, name='CO AQI differenced')
+wt = WT(co_diff1)
+wt.Plot_Rolling_Mean_Var(name='CO AQI differenced')
+
+co_diff2 = co_diff1.diff()[1:]
+print_strength_seas_tren(co_diff2, name='CO AQI second-order differencing')
+wt = WT(co_diff2)
+wt.Plot_Rolling_Mean_Var(name='CO AQI second-order differencing')
+
+fig, axes = plt.subplots(2, 1, sharex=True)
+plot_acf(co_diff2, lags=100, ax=axes[0])
+plot_pacf(co_diff2, lags=100, ax=axes[1])
+plt.tight_layout()
+plt.show()
+whiteness_test(co_diff2, name='CO AQI second-order differenced')
+
+acf_vals, _ = corr.acf(co_diff2.reset_index()['CO AQI'], max_lag=22, plot=False, return_acf=True)
+gpac_vals = gpac_table(acf_vals, na=10, nb=10, plot=True)
+plt.figure(figsize=(23, 20))
+sns.heatmap(gpac_vals, annot=True)
+plt.xticks(ticks=np.array(list(range(50))) + .5, labels=list(range(1, 51)))
+plt.title('Generalized Partial Autocorrelation (GPAC) Table')
+plt.xlabel('AR Order')
+plt.ylabel('MA Order')
+plt.tight_layout()
+plt.show()
+
 
 #%%
 """
@@ -520,84 +384,10 @@ print('As per the ADF test on CO AQI, the signal is stationary since the p-value
       'the significance threshold that is 0.05, for 95% confidence level.')
 print("\nCO AQI stationarized data's KPSS test")
 co_wt.kpss_test()
-print('As per the KPSS test on CO AQI, the signal is stationary since the p-value (0.1) is above '
-      'the significance threshold that is 0.05, for 95% confidence level.')
 
-print("\n\nNO2 AQI stationarized data's ADF test")
-no2_wt = WT(x=no2_log_diff)
-no2_wt.ADF_Cal()
-print('As per the ADF test on NO2 AQI, the signal is stationary since the p-value (0) is less than '
-      'the significance threshold that is 0.05, for 95% confidence level.')
-print("\nNO2 AQI stationarized data's KPSS test")
-no2_wt.kpss_test()
-print('As per the KPSS test on NO2 AQI, the signal is stationary since the p-value (0.1) is above '
-      'the significance threshold that is 0.05, for 95% confidence level.')
-
-print("\n\nSO2 AQI stationarized data's ADF test")
-so2_wt = WT(x=so2_stationary)
-so2_wt.ADF_Cal()
-print('As per the ADF test on SO2 AQI, the signal is stationary since the p-value (0) is less than '
-      'the significance threshold that is 0.05, for 95% confidence level.')
-print("\nSO2 AQI stationarized data's KPSS test")
-so2_wt.kpss_test()
-print('As per the KPSS test on SO2 AQI, the signal is stationary since the p-value (0.1) is above '
-      'the significance threshold that is 0.05, for 95% confidence level.')
-
-print("\n\nO3 AQI stationarized data's ADF test")
-o3_wt = WT(x=o3_log_diff)
-o3_wt.ADF_Cal()
-print('As per the ADF test on O3 AQI, the signal is stationary since the p-value (0) is less than '
-      'the significance threshold that is 0.05, for 95% confidence level.')
-print("\nO3 AQI stationarized data's KPSS test")
-o3_wt.kpss_test()
-print('As per the KPSS test on O3 AQI, the signal is stationary since the p-value (0.1) is above '
-      'the significance threshold that is 0.05, for 95% confidence level.')
 
 
 #%%
-"""
-Step 8 - Time Series Decomposition
-"""
-co_stl = STL(endog=co_aqi, period=12).fit()
-co_trend = co_stl.trend
-co_seasonal = co_stl.seasonal
-co_residual = co_stl.resid
-co_stl.plot()
-plt.show()
-
-plt.figure()
-plt.plot(co_trend * co_residual)
-plt.title('Seasonally adjusted CO AQI data')
-plt.show()
-
-wt = WT(x=co_trend * co_residual)
-wt.Plot_Rolling_Mean_Var(name='Seasonally adjusted data (STL)')
-wt.ADF_Cal()
-wt.kpss_test()
-
-
-corr.acf(pd.Series(co_trend*co_residual).diff()[1:], max_lag=40)
-
-no2_stl = STL(endog=no2_aqi, period=12).fit()
-no2_trend = no2_stl.trend
-no2_seasonal = no2_stl.seasonal
-no2_residual = no2_stl.resid
-no2_stl.plot()
-plt.show()
-
-so2_stl = STL(endog=so2_aqi, period=12).fit()
-so2_trend = so2_stl.trend
-so2_seasonal = so2_stl.seasonal
-so2_residual = so2_stl.resid
-so2_stl.plot()
-plt.show()
-
-o3_stl = STL(endog=o3_aqi, period=12).fit()
-o3_trend = o3_stl.trend
-o3_seasonal = o3_stl.seasonal
-o3_residual = o3_stl.resid
-o3_stl.plot()
-plt.show()
 
 #%%
 """
@@ -638,16 +428,16 @@ Feature Selection - PCA
 float_vars = float_vars[float_vars != "Year"]
 float_vars = float_vars[float_vars != "Station_Number"]
 
-from sklearn.decomposition import PCA
-
-pca = PCA()
-feature_cols = np.setdiff1d(float_vars, aqi_vars)
-pca.fit(joined_df[feature_cols], so2_stationary)
-# The following expression on the right side is expected to return values sorted in descending order
-n_components = len(pca.explained_variance_ratio_[pca.explained_variance_ratio_ >= 0.01])
-
-pca = PCA(n_components=n_components)
-X = pca.fit_transform(joined_df[feature_cols], so2_stationary)
+# from sklearn.decomposition import PCA
+#
+# pca = PCA()
+# feature_cols = np.setdiff1d(float_vars, aqi_vars)
+# pca.fit(joined_df[feature_cols], so2_stationary)
+# # The following expression on the right side is expected to return values sorted in descending order
+# n_components = len(pca.explained_variance_ratio_[pca.explained_variance_ratio_ >= 0.01])
+#
+# pca = PCA(n_components=n_components)
+# X = pca.fit_transform(joined_df[feature_cols], so2_stationary)
 
 #%% Split into train, and test subsets
 T = joined_df.shape[0]
@@ -712,41 +502,126 @@ plt.title('CO AQI Naive method')
 plt.legend()
 plt.show()
 
-#%%
 
-def snaive_pred_forecast(X, last_tr_index, test_length, m):
-    # 1-step prediction
-    prediction = []
-    for t in range((m-1), train_size):
-        k = int((t - 1) / m)
-        index = t + 1 - (m * (k + 1))
-        prediction.append(X.iloc[index])
 
-    # h-step prediction
-    T = X.loc[:last_tr_index].shape[0] - 1
-    for h in range(1, test_length + 1):
-        k = int((h - 1) / m)
-        index = T + h - (m * (k + 1))
-        X.iloc[T + h] = X.iloc[index]
-    return X
+#%% Q13 - ARIMA, and SARIMA
 
-last_tr_index = indices[train_size]
+# split CO AQI into train, test
+N = joined_df.shape[0]
+train_test_split = int(0.7 * N)
+co_train = joined_df.reset_index()['CO AQI'][:train_test_split]
+co_test = joined_df.reset_index()['CO AQI'][train_test_split:]
 
-co_snaive_pred_forecast = snaive_pred_forecast(joined_df['CO AQI'], last_tr_index, test_size, m=375)
+#%% CO Log transformation
+co_log = np.log(joined_df['CO AQI'])
 plt.figure()
-plt.plot(joined_df.iloc[:train_size]['CO AQI'], '-b', label='Training')
-plt.plot(train_indices, co_snaive_pred_forecast[0], '-', color='orange', label='Prediction' )
-plt.plot(joined_df.iloc[train_size:]['CO AQI'], '-g', label='Validation' )
-plt.plot(test_indices, co_snaive_pred_forecast[1], '-', color='maroon', label='Testing')
-plt.ylabel('CO AQI')
-plt.title('CO AQI Naive method')
-plt.legend()
+plt.plot(co_log)
+plt.xlim([0, 1000])
 plt.show()
-print('debug...')
+
+#%%
+print_strength_seas_tren(co_log, name='Original data')
+print('')
+print_strength_seas_tren(co_log, name='Log transformed data')
+
+#%%
+whiteness_test(pd.Series(co_log), 'CO AQI Log transformed')
+
+#%% First order differencing following log transformation
+co_diff1 = seasonal_differencing(co_log, seasonal_period=1)
+
+#%%
+plt.plot(co_diff1)
+plt.xlim([0, 1000])
+plt.show()
+
+#%%
+whiteness_test(pd.Series(co_diff1), 'CO diff1')
+
+#%%
+plot_acf_pacf(co_diff1, lags=400, xlims=[[-5, 400], [-1, 50], [-1, 11], [0, 100], [360, 400]])
+
+#%%
+acf_vals, _ = corr.acf(co_diff1, max_lag=28, plot=False, return_acf=True)
+gpac_vals = gpac_table(acf_vals, na=13, nb=13, plot=False)
+plt.figure(figsize=(13, 10))
+sns.heatmap(gpac_vals, annot=True)
+plt.xticks(ticks=np.array(list(range(13))) + .5, labels=list(range(1, 14)))
+plt.title('Generalized Partial Autocorrelation (GPAC) Table')
+plt.xlabel('AR Order')
+plt.ylabel('MA Order')
+plt.tight_layout()
+plt.show()
+
+#%%
+na = 4
+nb = 3
+d = 1
+arima_fit = sm.tsa.ARIMA(endog=co_log, order=(na,d,nb), trend='n').fit()
+arima_fit.summary()
+
+#%% Residual analysis
+yhat = arima_fit.predict()
+residual = co_log - yhat
+
+lags = 30
+plt.figure()
+plot_acf(yhat, lags=lags)
+plt.show()
+
+Q = train_test_split * (acf_vals[1:].T @ acf_vals[1:])
+max_Q = chi2.ppf(0.95, lags-na-nb)
+print(f"Computed Q value: {Q} is less than max critical value from the table: {max_Q}. Hence the residuals are white.")
+
+#%% Plot y vs yhat
+fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+axes[0].plot()
+plt.show()
 
 
+#%%
+def backwise_reg(df_train, y_train, target):
+    grid = np.zeros([1, len(cnames)])
+    df_train = df_train[np.setdiff1d(df_train.columns, target)]
 
+    df_train = standardise(df_train)
+    df_train = pd.concat([pd.DataFrame({'bias_c':np.ones([df_train.shape[0]])}), df_train.reset_index(drop=True)], axis=1)
 
+    curr_value = 1
+    filtered_cnames = np.setdiff1d(cnames, ['bias_c']+target)
+    ignored_cnames = []
+    while curr_value > 0.05 + 1e-3:
+        X_tr_subset = df_train[['bias_c'] + list(filtered_cnames)]
+        # X_ts_subset = df_test[['bias_c'] + list(np.setdiff1d(filtered_cnames, cname))]
+        ols = OLS(y_train.reshape([-1]), X_tr_subset).fit()
+        aic = ols.aic
+        bic = ols.bic
+        adj_r2 = ols.rsquared_adj
+
+        max_pval_idx = ols.pvalues.iloc[1:].argmax()
+        curr_value = ols.pvalues.iloc[1:][max_pval_idx]
+
+        if curr_value <= 0.05:
+            final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
+            return ignored_cnames, filtered_cnames, final_ols
+
+        ignore_col = ols.pvalues.iloc[1:].index[max_pval_idx]
+        ##--------- Check for improvement
+        tmp_filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
+        tmp_X = df_train[['bias_c'] + list(tmp_filtered_cnames)]
+        tmp_ols = OLS(y_train.reshape([-1]), tmp_X).fit()
+        new_adj_r2 = tmp_ols.rsquared_adj
+        new_bic = tmp_ols.bic
+        new_aic = tmp_ols.aic
+        if (new_adj_r2 < adj_r2 and np.abs(new_adj_r2 - adj_r2) > 2e-2) or new_bic > bic or new_aic > aic:
+            final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
+            return ignored_cnames, filtered_cnames, final_ols
+        ##--------
+
+        ignored_cnames.append(ignore_col)
+        filtered_cnames = list(filter(lambda x: x != ignore_col, filtered_cnames))
+    final_ols = OLS(y_train.reshape([-1]), df_train[['bias_c'] + list(filtered_cnames)]).fit()
+    return ignored_cnames, filtered_cnames, final_ols
 
 
 
